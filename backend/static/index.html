@@ -1,0 +1,124 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Crisis PR Agent</title>
+  <style>
+    * { box-sizing: border-box; }
+    body { font-family: system-ui, sans-serif; background: #0f172a; color: #e2e8f0; margin: 0; padding: 20px; }
+    .header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 24px; }
+    h1 { font-size: 1.25rem; margin: 0; }
+    .ticker { background: #1e293b; padding: 8px 16px; border-radius: 8px; font-family: monospace; }
+    textarea { width: 100%; min-height: 80px; padding: 12px; border-radius: 8px; border: 1px solid #475569; background: #1e293b; color: #e2e8f0; resize: vertical; }
+    button { background: #dc2626; color: white; border: none; padding: 10px 20px; border-radius: 8px; cursor: pointer; font-weight: 600; margin-top: 8px; }
+    button:hover { background: #b91c1c; }
+    button:disabled { opacity: 0.5; cursor: not-allowed; }
+    .card { background: #1e293b; border: 1px solid #334155; border-radius: 12px; padding: 16px; margin-bottom: 16px; }
+    .card h3 { margin: 0 0 12px 0; font-size: 0.75rem; text-transform: uppercase; letter-spacing: 0.05em; color: #94a3b8; }
+    .phase-dot { display: inline-block; width: 20px; height: 20px; border-radius: 50%; background: #475569; color: #94a3b8; text-align: center; line-height: 20px; font-size: 0.7rem; margin-right: 8px; }
+    .phase-dot.done { background: #16a34a; color: white; }
+    .grid { display: grid; grid-template-columns: 180px 1fr; gap: 24px; }
+    @media (max-width: 700px) { .grid { grid-template-columns: 1fr; } }
+    .green { border-color: #16a34a; background: rgba(22,163,74,0.1); }
+    .yellow { border-color: #ca8a04; background: rgba(202,138,4,0.1); }
+    .red { border-color: #dc2626; background: rgba(220,38,38,0.1); }
+    .value-box { display: inline-block; padding: 16px 24px; border-radius: 12px; margin: 8px 8px 0 0; }
+    ul { margin: 8px 0; padding-left: 20px; }
+    .hidden { display: none; }
+  </style>
+</head>
+<body>
+  <div class="header">
+    <h1>🔴 Crisis PR Agent</h1>
+    <div class="ticker">€<span id="cost">0.00</span> &nbsp; ⏱ <span id="time">0s</span></div>
+  </div>
+
+  <div class="card">
+    <textarea id="input" placeholder="Krise eingeben oder leer lassen und Demo starten...">Uber data breach 57 million accounts</textarea>
+    <button id="btn">🔍 Analyze Crisis</button>
+  </div>
+
+  <div class="grid">
+    <div class="card">
+      <h3>Pipeline</h3>
+      <div id="pipeline"></div>
+    </div>
+    <div>
+      <div id="recon" class="card hidden"></div>
+      <div id="history" class="card hidden"></div>
+      <div id="strategy" class="card hidden"></div>
+      <div id="costing" class="card hidden"></div>
+    </div>
+  </div>
+
+  <script>
+    const MOCK = {"phases":[{"phase":"recon","elapsed_seconds":14,"cost":{"total_cost":0.08},"data":{"company":"Uber","crisis_type":"Data Breach","severity":9.2,"virality":"high","summary":"57 million rider and driver accounts exposed; breach concealed for over a year.","key_facts":["Personal data exposed","Breach concealed for over a year","$100K paid to hackers"],"stakeholders":[{"group":"Riders","count":"57M"},{"group":"Drivers","count":"600K"},{"group":"Regulators"}],"sentiment":{"label":"Extremely Negative"}}},{"phase":"history","elapsed_seconds":28,"cost":{"total_cost":0.18},"data":{"precedents":[{"company":"Equifax","year":2017,"crisis":"Data breach 147M","response_strategy":"Delayed disclosure","outcome":"CEO resigned, $700M fine","lesson":"Delay destroys trust","lesson_type":"negative"},{"company":"Zoom","year":2020,"response_strategy":"Immediate transparency","outcome":"Trust rebuilt","lesson":"Speed + plan = recovery","lesson_type":"positive"}]}},{"phase":"strategy","elapsed_seconds":38,"cost":{"total_cost":0.25},"data":{"strategies":[{"id":"own_it","label":"Own It","color":"green","description":"Full transparency, apologize","risk_level":"low","recommended":true},{"id":"reframe","label":"Reframe","color":"yellow","description":"Acknowledge, pivot forward","risk_level":"medium","recommended":false},{"id":"hold_the_line","label":"Hold the Line","color":"red","description":"Minimal response","risk_level":"very_high","recommended":false}]}},{"phase":"costing","elapsed_seconds":134,"cost":{"total_cost":0.47},"data":{"agent":{"total_time_seconds":134,"total_cost_eur":0.47,"strategies_generated":3,"documents_generated":15},"traditional":{"time_range":"24-72 hours","cost_range":"€8,000-€25,000"},"savings_percent":99.8,"roi_multiple":"17,000x","cost_breakdown":[{"phase":"Recon","cost":0.08},{"phase":"History","cost":0.1},{"phase":"Strategy","cost":0.07},{"phase":"Drafting","cost":0.19},{"phase":"Overhead","cost":0.03}]}}]};
+    const names = { recon: 'Recon', history: 'History', strategy: 'Strategy', drafting: 'Drafting', costing: 'Costing' };
+    let step = 0;
+
+    function showPipeline(upTo) {
+      const el = document.getElementById('pipeline');
+      el.innerHTML = ['recon','history','strategy','drafting','costing'].map((p, i) =>
+        '<div class="phase-dot ' + (i <= upTo ? 'done' : '') + '">' + (i <= upTo ? '✓' : (i+1)) + '</div> ' + names[p]
+      ).join('<br>');
+    }
+
+    function showRecon(d) {
+      const el = document.getElementById('recon');
+      el.className = 'card';
+      el.innerHTML = '<h3>📋 Crisis Brief</h3><p><strong>' + d.company + '</strong> · ' + d.crisis_type + ' · Severity ' + d.severity + '/10</p><p>' + d.summary + '</p><ul>' + (d.key_facts || []).map(f => '<li>' + f + '</li>').join('') + '</ul><p>Stakeholders: ' + (d.stakeholders || []).map(s => s.group + (s.count ? ' ' + s.count : '')).join(', ') + '</p><p>Sentiment: ' + (d.sentiment && d.sentiment.label) + '</p>';
+    }
+
+    function showHistory(d) {
+      const el = document.getElementById('history');
+      el.className = 'card';
+      el.innerHTML = '<h3>📚 Historical Precedents</h3>' + (d.precedents || []).map(p => '<div class="card" style="margin-top:8px"><strong>' + p.company + ' (' + p.year + ')</strong><br>' + p.crisis + '<br>Response: ' + p.response_strategy + ' → ' + p.outcome + '<br><span class="' + p.lesson_type + '">Lesson: ' + p.lesson + '</span></div>').join('');
+    }
+
+    function showStrategy(d) {
+      const el = document.getElementById('strategy');
+      el.className = 'card';
+      el.innerHTML = '<h3>Strategies</h3>' + (d.strategies || []).map(s => '<div class="card ' + s.color + '"><strong>' + s.label + '</strong>' + (s.recommended ? ' ⭐' : '') + '<p>' + s.description + '</p><small>Risk: ' + s.risk_level + '</small></div>').join('');
+    }
+
+    function showCosting(d) {
+      const el = document.getElementById('costing');
+      el.className = 'card';
+      const a = d.agent, t = d.traditional;
+      el.innerHTML = '<h3>💰 Value Report</h3><div class="value-box" style="background:#1e293b">Traditional PR: ' + t.time_range + '<br><strong>' + t.cost_range + '</strong></div><div class="value-box green">Agent: ' + a.total_time_seconds + 's · <strong>€' + a.total_cost_eur.toFixed(2) + '</strong><br>' + a.documents_generated + ' drafts</div><p style="margin-top:16px;font-size:1.5rem">Savings: <strong>' + d.savings_percent + '%</strong> &nbsp; ROI: <strong>' + d.roi_multiple + '</strong></p>';
+    }
+
+    document.getElementById('btn').onclick = function() {
+      const btn = this;
+      btn.disabled = true;
+      step = 0;
+      document.getElementById('recon').classList.add('hidden');
+      document.getElementById('history').classList.add('hidden');
+      document.getElementById('strategy').classList.add('hidden');
+      document.getElementById('costing').classList.add('hidden');
+      showPipeline(-1);
+      document.getElementById('cost').textContent = '0.00';
+      document.getElementById('time').textContent = '0s';
+
+      const phases = MOCK.phases;
+      function run(i) {
+        if (i >= phases.length) { btn.disabled = false; return; }
+        const msg = phases[i];
+        step = i;
+        showPipeline(i);
+        document.getElementById('cost').textContent = msg.cost.total_cost.toFixed(2);
+        document.getElementById('time').textContent = msg.elapsed_seconds + 's';
+        if (msg.phase === 'recon') { document.getElementById('recon').classList.remove('hidden'); showRecon(msg.data); }
+        if (msg.phase === 'history') { document.getElementById('history').classList.remove('hidden'); showHistory(msg.data); }
+        if (msg.phase === 'strategy') { document.getElementById('strategy').classList.remove('hidden'); showStrategy(msg.data); }
+        if (msg.phase === 'costing') { document.getElementById('costing').classList.remove('hidden'); showCosting(msg.data); }
+        setTimeout(function() { run(i + 1); }, 900);
+      }
+      run(0);
+    };
+
+    showPipeline(-1);
+  </script>
+</body>
+</html>
