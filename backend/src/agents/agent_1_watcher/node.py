@@ -15,6 +15,30 @@ from src.clients.llm_client import llm
 from src.shared.types import ArticleScores, SUBJECT_KEYS, SUBJECT_DISPLAY_NAMES
 
 
+# Paywall indicators: content likely truncated behind a paywall (avoid footer phrases like "subscribe to newsletter")
+_PAYWALL_PATTERNS = (
+    "subscribe now",
+    "continue reading",
+    "continue reading this article",
+    "subscription required",
+    "paywall",
+    "subscriber-only",
+    "sign in to read",
+    "log in to read",
+    "premium content",
+    "barron's subscription",
+    "wsj subscription",
+)
+
+
+def _is_likely_paywalled(content: str) -> bool:
+    """Returns True if the content suggests the article is behind a paywall."""
+    if not content or not content.strip():
+        return True  # No content = treat as paywalled (unusable)
+    lower = content.lower()
+    return any(p in lower for p in _PAYWALL_PATTERNS)
+
+
 def _recency_multiplier(pub_date_str: str | None) -> float:
     """
     Computes recency multiplier per spec:
@@ -51,23 +75,24 @@ def _analyze_article_with_gemini(title: str, content: str, url: str) -> ArticleS
     prompt = """You are an expert in media analysis and crisis management.
 
 For this article, provide:
-1. **summary**: A concise summary in 1-3 sentences (max 300 chars). Get to the point.
-2. **subject**: One of these EXACT keys (write exactly): security_fraud, legal_compliance, ethics_management, product_bug, customer_service
+1. **is_substantive_article**: True ONLY if this is a real news article about the company. False if it's a newsletter signup page, promotional content, or mostly navigation/footer boilerplate (e.g. "Sign up for our newsletters", "Related Articles", "Subscribe and interact").
+2. **summary**: A concise summary in 1-3 sentences (max 300 chars). Get to the point.
+3. **subject**: One of these EXACT keys (write exactly): security_fraud, legal_compliance, ethics_management, product_bug, customer_service
    - security_fraud: fraud, data breach, security flaw
    - legal_compliance: lawsuit, fine, legal issue
    - ethics_management: greenwashing, bad management, values
    - product_bug: product defect, technical failure
    - customer_service: customer complaint, after-sales
-3. **author**: Author name if visible in the excerpt, else empty string
-4. **authority_score**: Score 1-5 by source (5=international, 4=national, 3=specialized, 2=blog, 1=unknown)
-5. **severity_score**: Score 1-5 by severity (1=mild criticism, 2=ethical, 3=legal, 4=scandal, 5=criminal)
+4. **author**: Author name if visible in the excerpt, else empty string
+5. **authority_score**: Score 1-5 by source (5=international, 4=national, 3=specialized, 2=blog, 1=unknown)
+6. **severity_score**: Score 1-5 by severity (1=mild criticism, 2=ethical, 3=legal, 4=scandal, 5=criminal)
 
 Article:
 Title: {title}
 URL: {url}
 Excerpt: {content}
 
-Respond with summary, subject, author, authority_score and severity_score.
+Respond with is_substantive_article, summary, subject, author, authority_score and severity_score.
 """.format(title=title[:200], url=url, content=(content or "")[:1500])
     try:
         return structured_llm.invoke(prompt)
@@ -104,7 +129,18 @@ def watcher_node(state: GraphState) -> dict:
         url = r.get("url", "")
         pub_date = r.get("pub_date")
 
-        # B: Gemini (summary + subject + author + Authority + Severity)
+        # Skip paywalled articles — don't recommend based on teaser only
+        if _is_likely_paywalled(content):
+            print(f"[AGENT 1] Skipped (paywall): {title[:60]}...")
+            continue
+
+        # Skip obvious newsletter/promo pages before calling Gemini
+        _title_lower = title.lower()
+        if any(x in _title_lower for x in ("sign up for", "newsletter", "get our newsletter", "subscribe to our")):
+            print(f"[AGENT 1] Skipped (newsletter/promo): {title[:60]}...")
+            continue
+
+        # B: Gemini (is_substantive + summary + subject + author + Authority + Severity)
         scores = _analyze_article_with_gemini(title, content, url)
         if scores is None:
             summary = (content or "")[:300] if content else title  # fallback
@@ -112,6 +148,9 @@ def watcher_node(state: GraphState) -> dict:
             author = ""
             authority_score = 3
             severity_score = 2
+        elif not getattr(scores, "is_substantive_article", True):
+            print(f"[AGENT 1] Skipped (not substantive): {title[:60]}...")
+            continue
         else:
             summary = (scores.summary or content or title)[:300]
             subject = scores.subject if scores.subject in SUBJECT_KEYS else "ethics_management"

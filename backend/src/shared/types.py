@@ -2,7 +2,7 @@
 Shared Pydantic schemas (Article, Agent 1 scores, Agent 2, etc.).
 """
 from typing import List
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
 
 
 # --- Agent 1: Gemini structured output for article scoring ---
@@ -26,10 +26,21 @@ SUBJECT_DISPLAY_NAMES = {
 
 class ArticleScores(BaseModel):
     """LLM output for Authority, Severity, summary and subject of an article (Agent 1)."""
+    is_substantive_article: bool = Field(
+        default=True,
+        description="True only if this is a real news article about the company. False if newsletter signup page, promotional content, or mostly navigation/footer boilerplate."
+    )
     summary: str = Field(
         max_length=300,
         description="Concise summary of the article in 1-3 sentences (max 300 chars)"
     )
+
+    @field_validator("summary", mode="before")
+    @classmethod
+    def truncate_summary(cls, v: str) -> str:
+        if isinstance(v, str) and len(v) > 300:
+            return v[:300]
+        return v
     subject: str = Field(
         description="One of: security_fraud, legal_compliance, ethics_management, product_bug, customer_service"
     )
