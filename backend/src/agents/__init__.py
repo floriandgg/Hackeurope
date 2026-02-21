@@ -1,1 +1,1 @@
-# Agents 1–5
+# Recon, History, Strategy, Drafting — Agent nodes

@@ -1,1 +1,1 @@
-# Configuration (env, clés API)
+# Configuration (env vars, API keys)
