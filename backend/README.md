@@ -58,10 +58,10 @@ Système agentique multi-agents pour la gestion de crise et la communication cor
 ## Rôles des agents
 
 ### Agent 1 — The Watcher (Collecte)
-- **API** : Tavily
-- **Mission** : Scraper le web, récupérer les articles de presse sur l'entreprise
-- **Output** : Top 10 articles classés (Source Authority × Severity × Recency)
-- **Détection** : Anomalies, scandales, sujets critiques
+- **API** : Tavily + Gemini 1.5 Flash
+- **Mission** : Scraper le web (Tavily), analyser avec LLM (Authority + Severity), calculer Exposure Score
+- **Output** : Top 10 articles avec `title`, `url`, `content`, `authority_score`, `severity_score`, `recency_multiplier`, `exposure_score`
+- **Formule** : `Exposure Score = (Authority × Severity) × Recency Multiplier`
 
 ### Agent 2 — Precedents (Recherche de cas similaires)
 - **API** : Tavily
@@ -185,7 +185,17 @@ Les agents 2, 3 et 4 émettent **un signal Paid.ai** par business outcome. Chaqu
 - `api_compute_cost_eur` : coût réel des tokens/API
 - `agent_gross_margin_percent` : marge brute (ROI)
 
-### Configuration
+### Tester l'Agent 1
+
+```bash
+cd backend
+pip install -r requirements.txt
+# Remplir .env avec TAVILY_API_KEY, GOOGLE_API_KEY
+
+PYTHONPATH=. python -m src.main Tesla
+```
+
+### Configuration Paid.ai
 
 1. Créer une clé API sur [app.paid.ai](https://app.paid.ai/agent-integration/api-keys)
 2. Définir `PAID_API_KEY` dans `.env` à la racine du projet

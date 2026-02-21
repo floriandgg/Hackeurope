@@ -19,7 +19,8 @@ class GraphState(TypedDict, total=False):
     customer_id: str  # external_customer_id Paid.ai
     crisis_id: str    # UUID unique par run (généré par Agent 1)
 
-    # Agent 1
+    # Agent 1 — chaque article contient : title, url, content, pub_date,
+    # authority_score, severity_score, recency_multiplier, exposure_score
     articles: list[dict[str, Any]]
 
     # Agent 2
