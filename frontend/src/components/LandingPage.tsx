@@ -1,5 +1,9 @@
 import { useCallback, useRef, useState, type FormEvent, type MouseEvent } from 'react';
 
+interface LandingPageProps {
+  onSubmit: (companyName: string, inputRect: DOMRect) => void;
+}
+
 const PROJECTS = [
   {
     title: 'Data Breach Response',
@@ -152,14 +156,14 @@ function CardContent({ project }: { project: (typeof PROJECTS)[number] }) {
   );
 }
 
-export default function LandingPage() {
+export default function LandingPage({ onSubmit }: LandingPageProps) {
   const [url, setUrl] = useState('');
+  const formCardRef = useRef<HTMLDivElement>(null);
 
   const handleSubmit = (e: FormEvent) => {
     e.preventDefault();
-    if (url.trim()) {
-      // Pipeline integration point — will navigate to analysis dashboard
-      console.log('Analyzing:', url);
+    if (url.trim() && formCardRef.current) {
+      onSubmit(url.trim(), formCardRef.current.getBoundingClientRect());
     }
   };
 
@@ -282,6 +286,7 @@ export default function LandingPage() {
             style={{ animationDelay: '600ms' }}
           >
             <div
+              ref={formCardRef}
               className="relative group rounded-2xl border border-silver/30
                          bg-white shadow-[0_2px_20px_rgba(0,0,0,0.04)]
                          transition-all duration-300
