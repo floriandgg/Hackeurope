@@ -271,9 +271,8 @@ export default function LandingPage() {
                        text-base sm:text-lg text-storm max-w-xl mt-6 leading-relaxed"
             style={{ animationDelay: '450ms' }}
           >
-            Paste an article link and get instant crisis analysis, PR strategy,
-            talking points, and response drafts&nbsp;&mdash; powered by a
-            multi-agent AI pipeline.
+            Enter a company name and our AI agents will scan for the latest
+            negative press&nbsp;&mdash; then help you craft the perfect response.
           </p>
 
           {/* ── Input Card ── */}
@@ -292,7 +291,7 @@ export default function LandingPage() {
               <textarea
                 value={url}
                 onChange={(e) => setUrl(e.target.value)}
-                placeholder="Paste a crisis article URL to begin analysis..."
+                placeholder="Enter a company name..."
                 rows={3}
                 className="w-full bg-transparent text-charcoal placeholder:text-silver
                            font-body text-base p-5 pr-16 resize-none outline-none"

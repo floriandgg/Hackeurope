@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project
 
-Crisis PR Agent — a real-time dashboard that displays AI agent outputs as they arrive. Users paste a crisis headline, five pipeline phases execute sequentially, and results appear progressively on screen. A live cost ticker runs in the top bar; the final panel shows an ROI comparison.
+Crisis PR Agent — an AI-powered crisis communications tool. The user enters a company name on the landing page. AI agents scrape for the most recent negative press, display the articles, and let the user select which crisis to respond to. From there, a multi-phase pipeline generates PR strategy, talking points, and response drafts.
 
 ## Tech Stack
 
@@ -24,23 +24,20 @@ All commands run from the `frontend/` directory:
 
 The frontend lives entirely in `frontend/src/`. Data currently comes from mock sources; the backend will connect via WebSocket later.
 
-**Data flow:** User input (InputBar) → App orchestrates five sequential pipeline phases → each phase reveals a dashboard section → CostTicker accumulates cost across phases → ValueDashboard shows final ROI.
+**User flow:** Landing page (company name input) → agent scrapes negative articles → user picks an article → five pipeline phases execute sequentially → results appear progressively.
 
-**Key hook:** `useWebSocket.ts` — abstracts the WebSocket connection. Currently returns mock data. When the backend team connects, only this hook changes; components stay the same.
+**Landing page** (`LandingPage.tsx`): Hero with input, project showcase cards at the bottom with 3D tilt-on-hover effect. Two Spline-ready containers are in place (background scene at `z-[1]` and a secondary slot between input and cards) for adding 3D models later.
 
-**Pipeline phases in order:**
+**Pipeline phases (planned):**
 1. CrisisBrief — initial crisis analysis
 2. Precedents — historical case lookup
 3. StrategyCards — response strategy options
 4. DraftViewer — generated PR statement drafts
 5. ValueDashboard — ROI comparison (agency vs AI cost)
 
-**Supporting components:**
-- PipelineTracker — visualizes which phase is active
-- CostTicker — running cost counter in the top bar
-- ActivityLog — streaming log of agent actions
+## Design
 
-## Design Requirements
-
-- Dark mode, premium aesthetic, smooth animations
+- Light theme with muted blue-gray palette (royal `#2b3a8f`, steel `#5a7d95`, storm `#6d8a9e`, mist `#e8eaf0`, periwinkle `#c8cce8`)
+- Fonts: Instrument Serif (display) + Outfit (body) via Google Fonts
+- Smooth staggered entrance animations, cursor-tracking card tilt
 - Should look like a polished product, not a hackathon prototype
