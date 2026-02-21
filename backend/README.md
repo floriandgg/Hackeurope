@@ -69,14 +69,14 @@ Système agentique multi-agents pour la gestion de crise et la communication cor
 - **Dépendance** : Agent 1 (contexte de la crise)
 - **Output** : Articles de référence pour alimenter la stratégie
 
-### Agent 3 — The Scorer (Scoring)
-- **LLM** : Gemini
-- **Mission** : Calculer 3 indicateurs
-  1. **Reach** : Potentiel de propagation
-  2. **Churn Risk** : Dangerosité client
-  3. **VaR** : Valeur à risque (€)
-- **Dépendance** : Agent 1 (articles à scorer)
-- **Output** : Scores pour chaque article/crise
+### Agent 3 — The Scorer (Risk Analyst)
+- **LLM** : Gemini (classification topic + viralité)
+- **Mission** : Transformer les scores Agent 1 en métriques financières
+  1. **Reach** : `(Authority × 20 000) × (Severity / 2) × ViralCoefficient`
+  2. **Churn Risk %** : `(Severity / 100) × TopicWeight`
+  3. **VaR** : `(Reach × CAC) + (ChurnRisk × TOTAL_CLIENTS × ARR)`
+- **Dépendance** : Agent 1 (articles avec authority_score, severity_score)
+- **Output** : Articles enrichis (reach_estimate, churn_risk_percent, value_at_risk) + total_var_impact
 
 ### Agent 4 — The Strategist (Décision + Génération)
 - **Dépendances** : Agent 2 + Agent 3 (tous deux requis)

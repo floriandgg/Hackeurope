@@ -19,7 +19,7 @@ class GraphState(TypedDict, total=False):
     customer_id: str  # external_customer_id Paid.ai
     crisis_id: str    # UUID unique par run (généré par Agent 1)
 
-    # Agent 1 — chaque article contient : title, url, content, pub_date,
+    # Agent 1 — chaque article : title, summary, url, content, pub_date,
     # authority_score, severity_score, recency_multiplier, exposure_score
     articles: list[dict[str, Any]]
 
@@ -27,10 +27,10 @@ class GraphState(TypedDict, total=False):
     precedents: list[dict[str, Any]]
     global_lesson: str
 
-    # Agent 3
-    scores: dict[str, Any]  # Reach, Churn Risk, VaR, severity_score, estimated_financial_loss
-    estimated_financial_loss: float
-    severity_score: int
+    # Agent 3 — enrichit chaque article avec reach_estimate, churn_risk_percent, value_at_risk
+    total_var_impact: float  # somme des VaR de tous les articles
+    estimated_financial_loss: float  # alias pour Paid.ai (= total_var_impact)
+    severity_score: int  # sévérité max parmi les articles
 
     # Agent 4
     strategy_report: dict[str, Any]

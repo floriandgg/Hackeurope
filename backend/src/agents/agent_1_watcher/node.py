@@ -43,34 +43,24 @@ def _recency_multiplier(pub_date_str: str | None) -> float:
 
 
 def _analyze_article_with_gemini(title: str, content: str, url: str) -> ArticleScores | None:
-    """Appelle Gemini pour obtenir Authority et Severity."""
+    """Appelle Gemini pour obtenir résumé, Authority et Severity."""
     if not llm:
         print("[AGENT 1] ⚠️ Client Gemini non configuré (GOOGLE_API_KEY manquante).")
         return None
     structured_llm = llm.with_structured_output(ArticleScores)
     prompt = """Tu es un expert en analyse médiatique et en gestion de crise.
-Analyse cet article de presse et attribue deux scores de 1 à 5.
 
-**Source Authority (1-5) :**
-- 5 : Média international (Reuters, NYT, BBC)
-- 4 : Média national (Le Monde, Figaro)
-- 3 : Presse spécialisée (TechCrunch, Wired)
-- 2 : Blog local / Petit média
-- 1 : Source inconnue / Réseau social
-
-**Severity (1-5) :**
-- 1 : Mild criticism (simple avis négatif)
-- 2 : Ethical concern (valeurs, management)
-- 3 : Legal issue (procès, amende)
-- 4 : Fraud/Scandal (fuite de données, détournement)
-- 5 : Criminal (mise en danger, acte illégal grave)
+Pour cet article, fournis :
+1. **summary** : Un résumé concis en 1 à 3 phrases (max 300 caractères). Va à l'essentiel.
+2. **authority_score** : Score 1-5 selon la source (5=international, 4=national, 3=spécialisée, 2=blog, 1=inconnu)
+3. **severity_score** : Score 1-5 selon la gravité (1=avis négatif, 2=éthique, 3=légal, 4=scandale, 5=criminel)
 
 Article :
 Titre : {title}
 URL : {url}
 Extrait : {content}
 
-Réponds uniquement avec authority_score et severity_score (entiers 1-5).
+Réponds avec summary (résumé court), authority_score et severity_score.
 """.format(title=title[:200], url=url, content=(content or "")[:1500])
     try:
         return structured_llm.invoke(prompt)
@@ -106,12 +96,14 @@ def watcher_node(state: GraphState) -> dict:
         url = r.get("url", "")
         pub_date = r.get("pub_date")
 
-        # B : Gemini (Authority + Severity)
+        # B : Gemini (résumé + Authority + Severity)
         scores = _analyze_article_with_gemini(title, content, url)
         if scores is None:
-            authority_score = 3  # défaut neutre
+            summary = (content or "")[:300] if content else title  # fallback
+            authority_score = 3
             severity_score = 2
         else:
+            summary = (scores.summary or content or title)[:300]
             authority_score = scores.authority_score
             severity_score = scores.severity_score
 
@@ -123,6 +115,7 @@ def watcher_node(state: GraphState) -> dict:
 
         article = {
             "title": title,
+            "summary": summary,
             "url": url,
             "content": content,
             "pub_date": pub_date,
