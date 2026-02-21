@@ -1,9 +1,9 @@
 """
-Paid.ai Helpers — Agentic billing (Outcome Pricing).
+Paid.ai helpers — Agentic billing (Outcome Pricing).
 
-Each agent (2, 3, 4) emits ONE signal at the end of its execution.
+Each agent (2, 3, 4) emits ONE signal at the end of execution.
 Signals include api_compute_cost_eur and agent_gross_margin_percent
-to demonstrate ROI (billed value vs actual cost).
+to show ROI (invoiced value vs actual cost).
 """
 
 import os
@@ -12,17 +12,19 @@ from pathlib import Path
 from paid import Paid
 from dotenv import load_dotenv
 
-_backend_env = Path(__file__).resolve().parents[2] / ".env"
-_root_env = Path(__file__).resolve().parents[3] / ".env"
-load_dotenv(_backend_env)
-load_dotenv(_root_env)
+# Load .env from backend/ or project root
+_env_backend = Path(__file__).resolve().parents[2] / ".env"
+_env_root = Path(__file__).resolve().parents[3] / ".env"
+load_dotenv(_env_backend) or load_dotenv(_env_root)
 
+# Paid client initialization
 PAID_API_KEY = os.getenv("PAID_API_KEY")
 paid_client = Paid(token=PAID_API_KEY) if PAID_API_KEY else None
 
+# Product constants
 EXTERNAL_PRODUCT_ID = "pr-crisis-swarm-001"
 
-# Reference pricing
+# Reference rates
 CONSULTING_HOUR_RATE_EUR = 150
 BASE_AUDIT_FEE_EUR = 500
 AUDIT_RISK_PERCENT = 0.0001  # 0.01% of financial risk
@@ -30,15 +32,15 @@ CRISIS_STRATEGY_FEE_EUR = 2500.00
 
 
 def _send_signal(signal: dict, agent_name: str) -> bool:
-    """Send a signal to Paid.ai. Returns True on success."""
+    """Sends a signal to Paid.ai. Returns True on success."""
     if not paid_client:
-        print(f"[PAID.AI] WARNING: Client not configured (PAID_API_KEY missing). Signal skipped: {agent_name}")
+        print(f"[PAID.AI] Client not configured (PAID_API_KEY missing). Signal ignored: {agent_name}")
         return False
     try:
         paid_client.signals.create_signals(signals=[signal])
         return True
     except Exception as e:
-        print(f"[PAID.AI] ERROR {agent_name}: {e}")
+        print(f"[PAID.AI] Error {agent_name}: {e}")
         return False
 
 
@@ -50,7 +52,7 @@ def emit_agent2_signal(
     api_compute_cost_eur: float,
 ) -> None:
     """
-    Agent 2 — The Historical Strategist.
+    Agent 2 — Historical Strategist.
     Business Outcome: Precedents found = consulting hours saved.
     """
     cases_count = len(past_cases)
@@ -80,8 +82,8 @@ def emit_agent2_signal(
 
     if _send_signal(signal, "AGENT 2"):
         print(
-            f"[PAID.AI - AGENT 2] Signal sent. Value: {consulting_value} EUR "
-            f"(API cost: {api_compute_cost_eur} EUR, Margin: {gross_margin_percent:.2f}%)."
+            f"[PAID.AI - AGENT 2] Signal sent. Value: {consulting_value}€ "
+            f"(API cost: {api_compute_cost_eur}€, Margin: {gross_margin_percent:.2f}%)."
         )
 
 
@@ -93,9 +95,9 @@ def emit_agent3_signal(
     api_compute_cost_eur: float,
 ) -> None:
     """
-    Agent 3 — The Impact Estimator (Risk Assessment).
-    Business Outcome: Financial impact modelling.
-    Fee = base 500 EUR + 0.01% of financial risk.
+    Agent 3 — Impact Estimator (Risk Assessment).
+    Business Outcome: Financial impact modeling.
+    Fee = base 500€ + 0.01% of risk.
     """
     audit_fee_eur = BASE_AUDIT_FEE_EUR + (estimated_financial_loss * AUDIT_RISK_PERCENT)
     audit_fee_eur = round(audit_fee_eur, 2)
@@ -124,8 +126,8 @@ def emit_agent3_signal(
 
     if _send_signal(signal, "AGENT 3"):
         print(
-            f"[PAID.AI - AGENT 3] Signal sent. Value: {audit_fee_eur} EUR "
-            f"(API cost: {api_compute_cost_eur} EUR, Margin: {gross_margin_percent:.2f}%)."
+            f"[PAID.AI - AGENT 3] Signal sent. Value: {audit_fee_eur}€ "
+            f"(API cost: {api_compute_cost_eur}€, Margin: {gross_margin_percent:.2f}%)."
         )
 
 
@@ -137,9 +139,9 @@ def emit_agent4_signal(
     api_compute_cost_eur: float,
 ) -> None:
     """
-    Agent 4 — The Executive Strategist.
+    Agent 4 — Executive Strategist.
     Business Outcome: Full crisis plan (premium deliverable).
-    Only emits if strategies were generated successfully.
+    Should only emit if strategies were generated successfully.
     """
     crisis_management_fee = CRISIS_STRATEGY_FEE_EUR
 
@@ -167,6 +169,6 @@ def emit_agent4_signal(
 
     if _send_signal(signal, "AGENT 4"):
         print(
-            f"[PAID.AI - AGENT 4] Signal sent. Value: {crisis_management_fee} EUR "
-            f"(API cost: {api_compute_cost_eur} EUR, Margin: {gross_margin_percent:.2f}%)."
+            f"[PAID.AI - AGENT 4] Signal sent. Value: {crisis_management_fee}€ "
+            f"(API cost: {api_compute_cost_eur}€, Margin: {gross_margin_percent:.2f}%)."
         )

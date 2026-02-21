@@ -1,8 +1,8 @@
 """
-LangGraph Node: Agent 4 — The Strategist (Executive Strategist).
+LangGraph Node: Agent 4 — The Strategist.
 
 Decision tree, report, posts, press release, internal email.
-Emits a Paid.ai signal ONLY if strategies were generated successfully.
+Emits Paid.ai signal ONLY if strategies generated successfully.
 """
 from src.graph.state import GraphState
 from src.utils.paid_helpers import emit_agent4_signal
@@ -28,6 +28,7 @@ def strategist_node(state: GraphState) -> dict:
     # TODO: Track API costs (LLM tokens) for this node
     api_compute_cost_eur = state.get("agent4_api_cost_eur", 0.12)
 
+    # Send Paid.ai signal ONLY if deliverable was generated
     if success:
         emit_agent4_signal(
             customer_external_id=customer_id,

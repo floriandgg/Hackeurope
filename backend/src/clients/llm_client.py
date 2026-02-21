@@ -1,18 +1,19 @@
 """
 LLM Client — Gemini via LangChain.
 
-llm_flash : Gemini 2.0 Flash — fast, for classification / query generation.
-llm_pro   : Gemini 2.5 Flash — powerful, for structured extraction and analysis.
+llm_flash : Gemini 2.5 Flash — fast, for classification / query generation.
+llm_pro   : Gemini 2.5 Pro — powerful, for structured extraction and analysis.
+llm       : alias for llm_flash (backwards compat with Agent 1, 3).
 """
 import os
 from pathlib import Path
 from dotenv import load_dotenv
 from langchain_google_genai import ChatGoogleGenerativeAI
 
-_backend_env = Path(__file__).resolve().parents[2] / ".env"
-_root_env = Path(__file__).resolve().parents[3] / ".env"
-load_dotenv(_backend_env)
-load_dotenv(_root_env)
+# Load .env from backend/ or project root
+_env_backend = Path(__file__).resolve().parents[2] / ".env"
+_env_root = Path(__file__).resolve().parents[3] / ".env"
+load_dotenv(_env_backend) or load_dotenv(_env_root)
 
 GOOGLE_API_KEY = os.getenv("GOOGLE_API_KEY")
 
@@ -28,5 +29,5 @@ llm_pro = ChatGoogleGenerativeAI(
     temperature=0,
 ) if GOOGLE_API_KEY else None
 
-# Backwards-compatible alias used by Agent 1
+# Backwards-compatible alias used by Agent 1, 3
 llm = llm_flash

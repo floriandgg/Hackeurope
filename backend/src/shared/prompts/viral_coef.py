@@ -1,1 +1,1 @@
-# Prompt for virality coefficient
+# Prompt for viral coefficient

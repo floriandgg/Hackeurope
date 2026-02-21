@@ -1,1 +1,1 @@
-# LangGraph Node: billing, reasoning, arbitrage, action refusal
+# LangGraph Node: invoice, reasoning, trade-offs, action refusals

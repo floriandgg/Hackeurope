@@ -1,1 +1,1 @@
-# Agent 1 — The Watcher (Collecte info, Tavily)
+# Agent 1 — The Watcher (Collect info, Tavily)
