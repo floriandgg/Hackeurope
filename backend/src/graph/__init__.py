@@ -1,1 +1,1 @@
-# LangGraph — Workflow & State
+# LangGraph — Workflow and State

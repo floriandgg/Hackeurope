@@ -1,1 +1,1 @@
-# Nœud LangGraph : facture, raisonnement, arbitrages, refus d'action
+# LangGraph Node: invoice, reasoning, trade-offs, action refusals

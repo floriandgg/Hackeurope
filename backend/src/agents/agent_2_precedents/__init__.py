@@ -1,1 +1,1 @@
-# Agent 2 — Precedents (Situations similaires, Tavily)
+# Agent 2 — Precedents (Similar situations, Tavily)

@@ -1,1 +1,1 @@
-# Types, config, prompts partagés
+# Shared types, config, prompts

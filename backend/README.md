@@ -1,22 +1,22 @@
-# Backend — Orchestration des Agents de Communication
+# Backend — Communication Agents Orchestration
 
-Système agentique multi-agents pour la gestion de crise et la communication corporate. Chaque agent joue un rôle spécialisé, orchestré via **LangGraph** en Python.
+Multi-agent system for crisis management and corporate communication. Each agent has a specialized role, orchestrated via **LangGraph** in Python.
 
 ---
 
-## Architecture du graphe
+## Graph Architecture
 
 ```
                     ┌─────────────────┐
                     │   INPUT         │
-                    │  (nom entreprise)│
+                    │  (company name) │
                     └────────┬────────┘
                              │
                              ▼
                     ┌─────────────────┐
                     │   AGENT 1       │
                     │   The Watcher   │
-                    │   Collecte info │
+                    │   Collect info  │
                     └────────┬────────┘
                              │
               ┌──────────────┴──────────────┐
@@ -24,8 +24,8 @@ Système agentique multi-agents pour la gestion de crise et la communication cor
      ┌─────────────────┐           ┌─────────────────┐
      │   AGENT 2       │           │   AGENT 3       │
      │   Precedents    │           │   The Scorer    │
-     │   Situations    │           │   Reach/Churn/  │
-     │   similaires    │           │   VaR           │
+     │   Similar cases │           │   Reach/Churn/  │
+     │                 │           │   VaR           │
      └────────┬────────┘           └────────┬────────┘
               │                             │
               └──────────────┬──────────────┘
@@ -34,7 +34,7 @@ Système agentique multi-agents pour la gestion de crise et la communication cor
                     ┌─────────────────┐
                     │   AGENT 4       │
                     │   Strategist    │
-                    │   Décision +    │
+                    │   Decision +    │
                     │   Report + Posts│
                     └────────┬────────┘
                              │
@@ -42,69 +42,71 @@ Système agentique multi-agents pour la gestion de crise et la communication cor
                     ┌─────────────────┐
                     │   AGENT 5       │
                     │   The CFO       │
-                    │   Facture ROI   │
+                    │   Invoice ROI   │
                     └────────┬────────┘
                              │
                              ▼
                     ┌─────────────────┐
                     │   OUTPUT        │
-                    │   Décision +    │
-                    │   Facture Paid.ai│
+                    │   Decision +    │
+                    │   Paid.ai Invoice│
                     └─────────────────┘
 ```
 
 ---
 
-## Rôles des agents
+## Agent Roles
 
-### Agent 1 — The Watcher (Collecte)
-- **API** : Tavily + Gemini 1.5 Flash
-- **Mission** : Scraper le web (Tavily), analyser avec LLM (Authority + Severity), calculer Exposure Score
-- **Output** : Top 10 articles avec `title`, `url`, `content`, `authority_score`, `severity_score`, `recency_multiplier`, `exposure_score`
-- **Formule** : `Exposure Score = (Authority × Severity) × Recency Multiplier`
+### Agent 1 — The Watcher (Collection)
+- **API**: Tavily + Gemini 1.5 Flash
+- **Mission**: Scrape the web (Tavily), analyze with LLM (Authority + Severity + Subject), compute Exposure Score, group by subject
+- **Output**:
+  - `articles`: Flat list for Agents 2, 3 (title, summary, url, content, pub_date, author, subject, authority_score, severity_score, recency_multiplier, exposure_score)
+  - `subjects`: Grouped for frontend — per subject: `subject`, `title` (display name), `summary`, `article_count`, `articles` (full article objects for click)
+- **Formula**: `Exposure Score = (Authority × Severity) × Recency Multiplier`
 
-### Agent 2 — Precedents (Recherche de cas similaires)
-- **API** : Tavily
-- **Mission** : Trouver des situations similaires dans d'autres articles/crises
-- **Dépendance** : Agent 1 (contexte de la crise)
-- **Output** : Articles de référence pour alimenter la stratégie
+### Agent 2 — Precedents (Similar Case Search)
+- **API**: Tavily
+- **Mission**: Find similar situations in other articles/crises
+- **Dependency**: Agent 1 (crisis context)
+- **Output**: Reference articles to feed the strategy
 
 ### Agent 3 — The Scorer (Risk Analyst)
-- **LLM** : Gemini (classification topic + viralité)
-- **Mission** : Transformer les scores Agent 1 en métriques financières
-  1. **Reach** : `(Authority × 20 000) × (Severity / 2) × ViralCoefficient`
-  2. **Churn Risk %** : `(Severity / 100) × TopicWeight`
-  3. **VaR** : `(Reach × CAC) + (ChurnRisk × TOTAL_CLIENTS × ARR)`
-- **Dépendance** : Agent 1 (articles avec authority_score, severity_score)
-- **Output** : Articles enrichis (reach_estimate, churn_risk_percent, value_at_risk) + total_var_impact
+- **LLM**: Gemini (topic + virality classification)
+- **Mission**: Transform Agent 1 scores into financial metrics
+  1. **Reach**: `(Authority × 20 000) × (Severity / 2) × ViralCoefficient`
+  2. **Churn Risk %**: `(Severity / 100) × TopicWeight`
+  3. **VaR**: `(Reach × CAC) + (ChurnRisk × TOTAL_CLIENTS × ARR)`
+- **Dependency**: Agent 1 (articles with authority_score, severity_score)
+- **Output**: Enriched articles (reach_estimate, churn_risk_percent, value_at_risk) + total_var_impact
 
-### Agent 4 — The Strategist (Décision + Génération)
-- **Dépendances** : Agent 2 + Agent 3 (tous deux requis)
-- **Mission** :
-  - Arbre de décision (VaR → action, Reach → canal, Churn → ton)
-  - Générer : report, posts, communiqué presse, email interne
-  - Proposer 3 stratégies avec coût, impact, ROI
-  - Recommander la stratégie max ROI
-- **Output** : Rapport complet + brouillons de communication
+### Agent 4 — The Strategist (Decision + Generation)
+- **Dependencies**: Agent 2 + Agent 3 (both required)
+- **Mission**:
+  - Decision tree (VaR → action, Reach → channel, Churn → tone)
+  - Generate: report, posts, press release, internal email
+  - Propose 3 strategies with cost, impact, ROI
+  - Recommend max ROI strategy
+- **Output**: Full report + communication drafts
 
-### Agent 5 — The CFO (Facturation & ROI)
-- **Intégration** : Helicone/LangSmith (traçage API) + Paid.ai (facture)
-- **Mission** :
-  - Tracer les coûts API des agents 1–4
-  - Générer la facture dynamique (ex : 500 € plan de sauvetage)
-  - Montrer le ROI massif vs coût réel
-- **Output** : Facture, justification, arbitrages, refus d'action
+### Agent 5 — The CFO (Billing & ROI)
+- **Integration**: Helicone/LangSmith (API tracking) + Paid.ai (invoice)
+- **Mission**:
+  - Track API costs for agents 1–4
+  - Generate dynamic invoice (e.g. €500 crisis plan)
+  - Show massive ROI vs actual cost
+- **Output**: Invoice, justification, trade-offs, action refusals
 
 ---
 
-## Flux de données (State LangGraph)
+## Data Flow (State LangGraph)
 
-Le state partagé entre les nœuds contient :
+Shared state between nodes:
 
-| Clé | Produit par | Consommé par |
-|-----|-------------|--------------|
-| `company_name` | Input | Tous |
-| `articles` | Agent 1 | Agent 2, 3, 4 |
+| Key | Produced by | Consumed by |
+|-----|-------------|-------------|
+| `company_name` | Input | All |
+| `articles` | Agent 1 | Agents 2, 3, 4 |
 | `precedents` | Agent 2 | Agent 4 |
 | `scores` (Reach, Churn, VaR) | Agent 3 | Agent 4 |
 | `strategy_report` | Agent 4 | Agent 5 |
@@ -113,7 +115,7 @@ Le state partagé entre les nœuds contient :
 
 ---
 
-## Arborescence des fichiers
+## File Structure
 
 ```
 backend/
@@ -125,34 +127,34 @@ backend/
 │   ├── __init__.py
 │   ├── main.py
 │   │
-│   ├── graph/                    # Orchestration LangGraph
+│   ├── graph/                    # LangGraph orchestration
 │   │   ├── __init__.py
-│   │   ├── workflow.py           # Graphe principal (compilation)
-│   │   └── state.py              # State typé
+│   │   ├── workflow.py           # Main graph (compilation)
+│   │   └── state.py              # Typed state
 │   │
 │   ├── agents/
 │   │   ├── __init__.py
-│   │   ├── agent_1_watcher/      # Collecte + détection
+│   │   ├── agent_1_watcher/      # Collection + detection
 │   │   │   ├── __init__.py
 │   │   │   └── node.py
-│   │   ├── agent_2_precedents/   # Cas similaires
+│   │   ├── agent_2_precedents/   # Similar cases
 │   │   │   ├── __init__.py
 │   │   │   └── node.py
 │   │   ├── agent_3_scorer/       # Scoring (Reach, Churn, VaR)
 │   │   │   ├── __init__.py
 │   │   │   └── node.py
-│   │   ├── agent_4_strategist/   # Décision + report + posts
+│   │   ├── agent_4_strategist/   # Decision + report + posts
 │   │   │   ├── __init__.py
 │   │   │   └── node.py
-│   │   └── agent_5_cfo/          # Facture Paid.ai
+│   │   └── agent_5_cfo/          # Paid.ai invoice
 │   │       ├── __init__.py
 │   │       └── node.py
 │   │
 │   ├── shared/
 │   │   ├── __init__.py
-│   │   ├── types.py              # Schémas Pydantic
-│   │   ├── config.py             # Variables d'environnement
-│   │   └── prompts/              # Prompts LLM par agent
+│   │   ├── types.py              # Pydantic schemas
+│   │   ├── config.py             # Environment variables
+│   │   └── prompts/              # LLM prompts per agent
 │   │       ├── __init__.py
 │   │       ├── severity.py
 │   │       ├── viral_coef.py
@@ -170,46 +172,46 @@ backend/
 
 ---
 
-## Exécution du graphe (conceptuel)
+## Graph Execution (conceptual)
 
-1. **Condition de branchement** : Après Agent 1, déclencher Agent 2 et Agent 3 en **parallèle** (branches indépendantes).
-2. **Condition de convergence** : Agent 4 attend que Agent 2 **et** Agent 3 aient terminé.
-3. **Ordre final** : Agent 1 → (Agent 2 ∥ Agent 3) → Agent 4 → Agent 5.
+1. **Branch condition**: After Agent 1, trigger Agents 2 and 3 in **parallel** (independent branches).
+2. **Convergence condition**: Agent 4 waits for both Agent 2 **and** Agent 3 to finish.
+3. **Final order**: Agent 1 → (Agent 2 ∥ Agent 3) → Agent 4 → Agent 5.
 
 ---
 
-## Paid.ai — Facturation agentique (Outcome Pricing)
+## Paid.ai — Agentic Billing (Outcome Pricing)
 
-Les agents 2, 3 et 4 émettent **un signal Paid.ai** par business outcome. Chaque signal inclut :
-- `human_equivalent_value_eur` : valeur facturée (équivalent humain)
-- `api_compute_cost_eur` : coût réel des tokens/API
-- `agent_gross_margin_percent` : marge brute (ROI)
+Agents 2, 3 and 4 emit **one Paid.ai signal** per business outcome. Each signal includes:
+- `human_equivalent_value_eur`: invoiced value (human equivalent)
+- `api_compute_cost_eur`: actual token/API cost
+- `agent_gross_margin_percent`: gross margin (ROI)
 
-### Tester l'Agent 1
+### Test Agent 1
 
 ```bash
 cd backend
 pip install -r requirements.txt
-# Remplir .env avec TAVILY_API_KEY, GOOGLE_API_KEY
+# Fill .env with TAVILY_API_KEY, GOOGLE_API_KEY
 
 PYTHONPATH=. python -m src.main Tesla
 ```
 
-### Configuration Paid.ai
+### Paid.ai Configuration
 
-1. Créer une clé API sur [app.paid.ai](https://app.paid.ai/agent-integration/api-keys)
-2. Définir `PAID_API_KEY` dans `.env` à la racine du projet
-3. Produit : `pr-crisis-swarm-001`
+1. Create an API key at [app.paid.ai](https://app.paid.ai/agent-integration/api-keys)
+2. Set `PAID_API_KEY` in `.env` at project root
+3. Product: `pr-crisis-swarm-001`
 
-### Signaux par agent
+### Signals per agent
 
-| Agent | Event | Facturation |
-|-------|-------|-------------|
-| Agent 2 | `historical_precedents_extracted` | Variable (cas × 3h × 150€/h) |
-| Agent 3 | `risk_assessment_completed` | 500€ + 0,01 % du risque |
-| Agent 4 | `crisis_strategy_delivered` | Fixe 2 500€ (livrable premium) |
+| Agent | Event | Billing |
+|-------|-------|---------|
+| Agent 2 | `historical_precedents_extracted` | Variable (cases × 3h × €150/h) |
+| Agent 3 | `risk_assessment_completed` | €500 + 0.01% of risk |
+| Agent 4 | `crisis_strategy_delivered` | Fixed €2,500 (premium deliverable) |
 
-### GraphState obligatoire
+### Required GraphState
 
-- `customer_id` : external_customer_id Paid.ai (défini par Agent 1)
-- `crisis_id` : UUID unique par run (généré par Agent 1)
+- `customer_id`: Paid.ai external_customer_id (set by Agent 1)
+- `crisis_id`: Unique UUID per run (generated by Agent 1)

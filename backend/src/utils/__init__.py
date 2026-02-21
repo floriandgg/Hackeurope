@@ -1,1 +1,1 @@
-# Utilitaires (Paid.ai helpers, etc.)
+# Utilities (Paid.ai helpers, etc.)

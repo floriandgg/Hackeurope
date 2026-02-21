@@ -1,1 +1,1 @@
-# Prompt few-shot pour classification Severity (1–5)
+# Few-shot prompt for Severity classification (1–5)

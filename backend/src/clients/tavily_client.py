@@ -1,14 +1,15 @@
 """
-Client Tavily API — recherche d'actualités.
+Tavily API client — news search.
 """
 import os
 from pathlib import Path
 from tavily import TavilyClient
 from dotenv import load_dotenv
 
-# Charge .env depuis backend/
-_env_path = Path(__file__).resolve().parents[2] / ".env"
-load_dotenv(_env_path)
+# Load .env from backend/ or project root
+_env_backend = Path(__file__).resolve().parents[2] / ".env"
+_env_root = Path(__file__).resolve().parents[3] / ".env"
+load_dotenv(_env_backend) or load_dotenv(_env_root)
 
 TAVILY_API_KEY = os.getenv("TAVILY_API_KEY")
 tavily_client = TavilyClient(api_key=TAVILY_API_KEY) if TAVILY_API_KEY else None
@@ -16,11 +17,11 @@ tavily_client = TavilyClient(api_key=TAVILY_API_KEY) if TAVILY_API_KEY else None
 
 def search_news(company_name: str, max_results: int = 10) -> list[dict]:
     """
-    Recherche les actualités critiques/scandales sur une entreprise.
-    Utilise topic="news" et search_depth="advanced".
+    Searches for critical/scandal news about a company.
+    Uses topic="news" and search_depth="advanced".
     """
     if not tavily_client:
-        print("[AGENT 1] ⚠️ Client Tavily non configuré (TAVILY_API_KEY manquante).")
+        print("[AGENT 1] Tavily client not configured (TAVILY_API_KEY missing).")
         return []
 
     query = f"latest scandal or critical news about {company_name}"
@@ -38,6 +39,6 @@ def search_news(company_name: str, max_results: int = 10) -> list[dict]:
             "url": r.get("url", ""),
             "content": r.get("content", ""),
             "score": r.get("score", 0.0),
-            "pub_date": r.get("published_date") or r.get("pub_date"),  # disponible si topic="news"
+            "pub_date": r.get("published_date") or r.get("pub_date"),  # available if topic="news"
         })
     return results
