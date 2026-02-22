@@ -15,6 +15,11 @@ SUBJECT_KEYS = (
     "customer_service",
 )
 
+class ParagraphDecisions(BaseModel):
+    """LLM output: one boolean per paragraph — true if it belongs to the article."""
+    decisions: List[bool] = Field(description="Exactly one boolean per paragraph, in order")
+
+
 SUBJECT_DISPLAY_NAMES = {
     "security_fraud": "Security & Fraud",
     "legal_compliance": "Legal & Compliance",
@@ -22,6 +27,18 @@ SUBJECT_DISPLAY_NAMES = {
     "product_bug": "Product & Technical",
     "customer_service": "Customer Service",
 }
+
+# Risk multipliers by subject (governance/reputation crises weigh more)
+SUBJECT_RISK_MULTIPLIERS = {
+    "security_fraud": 1.8,
+    "legal_compliance": 1.5,
+    "ethics_management": 1.8,
+    "product_bug": 1.2,
+    "customer_service": 1.0,
+}
+
+# Sentiment weights for crisis scoring (asymmetric: negative counts full)
+SENTIMENT_WEIGHTS = {"negative": 1.0, "neutral": 0.5, "positive": 0.1}
 
 
 class ArticleScores(BaseModel):
@@ -57,6 +74,19 @@ class ArticleScores(BaseModel):
         ge=1, le=5,
         description="1=Mild criticism, 2=Ethical, 3=Legal, 4=Fraud/Scandal, 5=Criminal"
     )
+    sentiment: str = Field(
+        default="neutral",
+        description="One of: negative, neutral, positive. Is the article critical, balanced, or favorable toward the company?"
+    )
+
+    @field_validator("sentiment", mode="before")
+    @classmethod
+    def normalize_sentiment(cls, v: str) -> str:
+        if isinstance(v, str):
+            v = v.lower().strip()
+            if v in ("negative", "neutral", "positive"):
+                return v
+        return "neutral"
 
 
 # --- Agent 2: Input contract from Agent 1 ---

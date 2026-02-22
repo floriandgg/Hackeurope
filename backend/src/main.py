@@ -44,7 +44,7 @@ def main():
         summary = a.get("summary", "") or ""
         url = a.get("url", "") or ""
         print(f"\n--- Article {i} ---")
-        print(f"  title:               {title[:90] + ('...' if len(title) > 90 else '')}")
+        print(f"  title:               {title}")
         print(f"  summary:             {summary[:200] + ('...' if len(summary) > 200 else '')}")
         print(f"  pub_date:            {a.get('pub_date') or 'N/A'}")
         print(f"  author:              {a.get('author') or 'N/A'}")

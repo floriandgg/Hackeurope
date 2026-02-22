@@ -3,7 +3,10 @@ LangGraph Node: Agent 3 — Risk Analyst.
 
 Transforms Agent 1 qualitative scores into financial metrics:
 Reach, Churn Risk, VaR (Value at Risk).
-Emits a Paid.ai signal at the end (risk_assessment_completed).
+Uses dampened formulas to avoid overestimation:
+- Reach: 5000 * Authority (capped at 1M), with conversion rate for acquisition loss
+- Churn: correlated to Authority (exposure) and Severity
+- Deduplication: multi-article VaR uses decreasing weights (1.0, 0.2, 0.1, ...)
 """
 from src.graph.state import GraphState
 from src.clients.llm_client import llm
@@ -15,6 +18,14 @@ from src.utils.paid_helpers import emit_agent3_signal
 CAC = 100  # Cost per Acquired Customer in EUR
 ARR = 1200  # Average Annual Revenue per Customer in EUR
 TOTAL_CLIENTS = 10000  # Total customer base
+REACH_CAP = 1_000_000  # Max reach for simulation
+REACH_MULTIPLIER = 5000  # Was 20_000; divided by 4 to reduce overestimation
+ACQUISITION_CONVERSION_RATE = 0.005  # 0.5% of reach are lost prospects
+EXPOSURE_RATE = 0.1  # 10% of clients exposed to tier-1 news
+CHURN_RATE_FACTOR = 0.1  # Dampening: not all exposed clients churn
+
+# Deduplication weights: 1st article 100%, 2nd 20%, 3rd+ 10%
+DEDUP_WEIGHTS = [1.0, 0.2, 0.1]
 
 # Topic weights (default "Bank" profile)
 TOPIC_WEIGHTS = {
@@ -77,24 +88,43 @@ Respond only with topic and viral_coefficient.
 
 
 def _compute_reach(authority_score: int, severity_score: int, viral_coefficient: float) -> float:
-    """Reach = (Authority * 20000) * (Severity / 2) * ViralCoefficient"""
-    return float((authority_score * 20_000) * (severity_score / 2) * viral_coefficient)
+    """Reach = 5000 * Authority * (Severity/2) * ViralCoeff, capped at REACH_CAP."""
+    raw = float(REACH_MULTIPLIER * authority_score * (severity_score / 2) * viral_coefficient)
+    return min(raw, REACH_CAP)
 
 
-def _compute_churn_risk_percent(severity_score: int, topic_weight: float) -> float:
-    """Churn Risk % = (Severity / 100) * Topic Weight (returns decimal, e.g. 0.15)"""
-    return (severity_score / 100.0) * topic_weight
+def _compute_exposed_clients(authority_score: int) -> float:
+    """Clients exposed to the news. Only Authority/5 * 10% of base."""
+    return TOTAL_CLIENTS * (authority_score / 5.0) * EXPOSURE_RATE
+
+
+def _compute_acquisition_loss(reach: float) -> float:
+    """Lost prospects: 0.5% of reach would have been acquirable."""
+    return reach * ACQUISITION_CONVERSION_RATE * CAC
+
+
+def _compute_churn_loss(
+    authority_score: int,
+    severity_score: int,
+    topic_weight: float,
+) -> float:
+    """Churn loss: exposed clients * severity * topic sensitivity * ARR * dampening."""
+    exposed = _compute_exposed_clients(authority_score)
+    severity_factor = severity_score / 5.0
+    topic_factor = topic_weight / 10.0
+    return exposed * severity_factor * topic_factor * CHURN_RATE_FACTOR * ARR
 
 
 def _compute_value_at_risk(
     reach: float,
-    churn_risk_percent: float,
+    authority_score: int,
+    severity_score: int,
+    topic_weight: float,
 ) -> float:
-    """VaR = (Reach * CAC) + ((ChurnRisk * TOTAL_CLIENTS) * ARR)"""
-    cost_marketing = reach * CAC
-    clients_at_risk = churn_risk_percent * TOTAL_CLIENTS
-    revenue_loss = clients_at_risk * ARR
-    return cost_marketing + revenue_loss
+    """VaR = Acquisition Loss + Churn Loss (no more Reach * CAC on full audience)."""
+    acquisition_loss = _compute_acquisition_loss(reach)
+    churn_loss = _compute_churn_loss(authority_score, severity_score, topic_weight)
+    return acquisition_loss + churn_loss
 
 
 def scorer_node(state: GraphState) -> dict:
@@ -134,14 +164,16 @@ def scorer_node(state: GraphState) -> dict:
             topic_weight = 1.0
             viral_coefficient = 1.2
 
-        # Calculation formulas
+        # Calculation formulas (dampened)
         reach = _compute_reach(authority_score, severity_score, viral_coefficient)
-        churn_risk_decimal = _compute_churn_risk_percent(severity_score, topic_weight)
-        value_at_risk = _compute_value_at_risk(reach, churn_risk_decimal)
+        exposed_clients = _compute_exposed_clients(authority_score)
+        value_at_risk = _compute_value_at_risk(
+            reach, authority_score, severity_score, topic_weight
+        )
 
         # Round to 2 decimals
         reach = round(reach, 2)
-        churn_risk_percent = round(churn_risk_decimal * 100, 2)  # for display (e.g. 15.0)
+        churn_risk_percent = round((exposed_clients / TOTAL_CLIENTS) * 100, 2)  # exposure %
         value_at_risk = round(value_at_risk, 2)
 
         art_enriched = {
@@ -151,8 +183,6 @@ def scorer_node(state: GraphState) -> dict:
             "value_at_risk": value_at_risk,
         }
         enriched_articles.append(art_enriched)
-
-        total_var_impact += value_at_risk
         max_severity = max(max_severity, severity_score)
 
         print(
@@ -160,6 +190,12 @@ def scorer_node(state: GraphState) -> dict:
             f"Reach: {reach:,.0f} | VaR: {value_at_risk:,.2f}€"
         )
 
+    # Deduplication: sort by VaR desc, apply decreasing weights (1.0, 0.2, 0.1, ...)
+    sorted_by_var = sorted(enriched_articles, key=lambda a: a["value_at_risk"], reverse=True)
+    total_var_impact = 0.0
+    for i, art in enumerate(sorted_by_var):
+        w = DEDUP_WEIGHTS[i] if i < len(DEDUP_WEIGHTS) else 0.1
+        total_var_impact += art["value_at_risk"] * w
     total_var_impact = round(total_var_impact, 2)
     estimated_financial_loss = total_var_impact
 
