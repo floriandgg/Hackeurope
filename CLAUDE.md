@@ -26,7 +26,7 @@ The frontend lives entirely in `frontend/src/`. Data currently comes from mock s
 
 **User flow:** Landing page (company name input) → bubble transition → article discovery page (agent timeline + topic cards) → user picks a topic → expanded view with articles → "Respond to Topic" → strategy page (3 response strategies) → "View Drafts" → (planned) draft generation and remaining pipeline phases.
 
-**App.tsx:** Manages view state (`landing` | `discovery` | `strategy`) and a FLIP-style bubble transition between landing and discovery. Passes `onRespondToTopic` callback down to discovery page, which triggers navigation to the strategy view with topic context.
+**App.tsx:** Manages view state (`landing` | `discovery` | `strategy` | `precedents`) and a FLIP-style bubble transition between landing and discovery. Passes `onRespondToTopic` callback down to discovery page, which triggers navigation to the strategy view with topic context. From strategy, `onSeeWhy` navigates to the precedents view; `onBack` from precedents returns to strategy.
 
 **Landing page** (`LandingPage.tsx`): Hero with textarea input, project showcase cards at the bottom with 3D tilt-on-hover effect (`TiltCard` component). Two Spline-ready containers are in place (background scene at `z-[1]` and a secondary slot between input and cards) for adding 3D models later. Desktop uses a fanned card layout; mobile uses a horizontal scroll.
 

@@ -2,6 +2,8 @@ import { useState, useEffect, useCallback } from 'react'
 import LandingPage from './components/LandingPage'
 import ArticleDiscoveryPage from './components/ArticleDiscoveryPage'
 import StrategyPage from './components/StrategyPage'
+import PrecedentsPage from './components/PrecedentsPage'
+import DraftViewerPage from './components/DraftViewerPage'
 
 interface TopicInfo {
   name: string;
@@ -9,9 +11,10 @@ interface TopicInfo {
 }
 
 export default function App() {
-  const [view, setView] = useState<'landing' | 'discovery' | 'strategy'>('landing')
+  const [view, setView] = useState<'landing' | 'discovery' | 'strategy' | 'precedents' | 'drafts'>('landing')
   const [companyName, setCompanyName] = useState('')
   const [selectedTopic, setSelectedTopic] = useState<TopicInfo | null>(null)
+  const [selectedStrategy, setSelectedStrategy] = useState<number>(0)
   const [isTransitioning, setIsTransitioning] = useState(false)
   const [inputRect, setInputRect] = useState<DOMRect | null>(null)
   const [bubbleExpanded, setBubbleExpanded] = useState(false)
@@ -58,8 +61,17 @@ export default function App() {
     setSelectedTopic(null)
   }, [])
 
-  const handleViewDrafts = useCallback((_strategyIndex: number) => {
-    // Future: navigate to DraftViewer phase
+  const handleViewDrafts = useCallback((strategyIndex: number) => {
+    setSelectedStrategy(strategyIndex)
+    setView('drafts')
+  }, [])
+
+  const handleSeeWhy = useCallback(() => {
+    setView('precedents')
+  }, [])
+
+  const handleBackToStrategy = useCallback(() => {
+    setView('strategy')
   }, [])
 
   return (
@@ -108,6 +120,24 @@ export default function App() {
           topic={selectedTopic}
           onBack={handleBackToDiscovery}
           onViewDrafts={handleViewDrafts}
+          onSeeWhy={handleSeeWhy}
+        />
+      )}
+
+      {view === 'precedents' && selectedTopic && (
+        <PrecedentsPage
+          companyName={companyName}
+          topic={selectedTopic}
+          onBack={handleBackToStrategy}
+        />
+      )}
+
+      {view === 'drafts' && selectedTopic && (
+        <DraftViewerPage
+          companyName={companyName}
+          topic={selectedTopic}
+          strategyIndex={selectedStrategy}
+          onBack={handleBackToStrategy}
         />
       )}
     </>

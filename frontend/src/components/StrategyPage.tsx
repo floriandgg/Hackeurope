@@ -12,6 +12,7 @@ interface StrategyPageProps {
   topic: TopicInfo;
   onBack: () => void;
   onViewDrafts: (strategyIndex: number) => void;
+  onSeeWhy: () => void;
 }
 
 /* ─── Strategy Data ─── */
@@ -278,6 +279,7 @@ export default function StrategyPage({
   topic,
   onBack,
   onViewDrafts,
+  onSeeWhy,
 }: StrategyPageProps) {
   return (
     <div className="relative min-h-screen overflow-hidden bg-white">
@@ -425,6 +427,7 @@ export default function StrategyPage({
             style={{ animationDelay: '900ms' }}
           >
             <button
+              onClick={onSeeWhy}
               className="group flex items-center gap-2.5 px-6 py-3 rounded-full
                          border border-silver/30 bg-white/80 backdrop-blur-sm
                          shadow-[0_2px_12px_rgba(0,0,0,0.04)]
