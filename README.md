@@ -6,6 +6,14 @@ Enter a company name. Our 5-agent AI pipeline scans the web for negative press, 
 
 > Built for [HackEurope 2026](https://hackeurope.dev) — the AI hackathon.
 
+## The Problem
+
+When a corporate crisis hits, whether a data breach, a viral scandal, or a product recall, companies have hours, not days, to respond. Every minute of silence costs money, trust and market cap.
+Today, the standard response is to call a PR agency. That means 48 to 72 hours to assemble a team and brief them, $50,000 to $200,000+ in consulting fees for a single crisis, generic strategies that ignore your company's specific exposure, and no financial quantification of the actual risk.
+Meanwhile, the news cycle moves in real time. By the time the agency delivers a strategy deck, the narrative has already been written. Without you.
+HarborAI changes that. In seconds, not days.
+
+
 ---
 
 ## How It Works
