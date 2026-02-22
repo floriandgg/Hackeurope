@@ -24,7 +24,7 @@ All commands run from the `frontend/` directory:
 
 The frontend lives entirely in `frontend/src/`. Data currently comes from mock sources; the backend will connect via WebSocket later.
 
-**User flow:** Landing page (company name input) → bubble transition → article discovery page (agent timeline + topic cards) → user picks a topic → expanded view with articles → "Respond to Topic" → strategy page (3 response strategies) → "See Why" → precedents page (historical case timeline) / "View Drafts" → (planned) draft generation and remaining pipeline phases.
+**User flow:** Landing page (company name input) → bubble transition → article discovery page (agent timeline + topic cards) → user picks a topic → expanded view with articles → "Respond to Topic" → strategy page (3 response strategies) → "See Why" → precedents page (historical case timeline) / "View Drafts" → draft viewer page (channel-specific response drafts + tone analysis).
 
 **App.tsx:** Manages view state (`landing` | `discovery` | `strategy` | `precedents` | `drafts`) and a FLIP-style bubble transition between landing and discovery. Passes `onRespondToTopic` callback down to discovery page, which triggers navigation to the strategy view with topic context. From strategy, `onSeeWhy` navigates to the precedents view; `onViewDrafts` navigates to the drafts view with the selected strategy index. `onBack` from precedents or drafts returns to strategy.
 
