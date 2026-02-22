@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import type { PrecedentsData, PrecedentCase, PrecedentArticle } from '../api';
+import AgentScene from './AgentScene';
 
 /* ─── Types ─── */
 
@@ -509,6 +510,16 @@ export default function PrecedentsPage({
                   </div>
                 </div>
               )}
+
+              {/* Agent Scene */}
+              <div className="mt-6">
+                <AgentScene
+                  scenario="precedents"
+                  completedSteps={completedSteps}
+                  activeStep={activeStep}
+                  isDone={completedSteps >= PRECEDENT_AGENT_STEPS.length}
+                />
+              </div>
             </div>
           </aside>
 
