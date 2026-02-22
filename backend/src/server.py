@@ -4,10 +4,13 @@ FastAPI server — exposes Agent 1 (The Watcher) via REST.
 Run:
     cd backend && PYTHONPATH=. uvicorn src.server:app --reload --port 8000
 """
+import asyncio
+import json
 import sys
 import time
 from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
+from queue import Queue
 
 from dotenv import load_dotenv
 
@@ -22,6 +25,7 @@ if str(_backend) not in sys.path:
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
 
 from src.agents.agent_1_watcher.node import watcher_node
@@ -60,6 +64,76 @@ def search(req: SearchRequest):
         "crisis_id": state.get("crisis_id", ""),
         "subjects": subjects,
     }
+
+
+async def _search_stream_generator(company_name: str):
+    """Yields SSE events: step events then a final result event."""
+    event_queue: Queue = Queue()
+
+    def on_step(step_id: str):
+        event_queue.put(("step", step_id))
+
+    def run_watcher():
+        try:
+            state = watcher_node({
+                "company_name": company_name,
+                "on_step": on_step,
+            })
+            # Strip content for response
+            subjects = state.get("subjects", [])
+            for subj in subjects:
+                for article in subj.get("articles", []):
+                    article.pop("content", None)
+            event_queue.put((
+                "result",
+                {
+                    "company_name": company_name,
+                    "crisis_id": state.get("crisis_id", ""),
+                    "subjects": subjects,
+                },
+            ))
+        except Exception as e:
+            event_queue.put(("error", str(e)))
+        finally:
+            event_queue.put(("done", None))
+
+    loop = asyncio.get_running_loop()
+    with ThreadPoolExecutor(max_workers=1) as ex:
+        ex.submit(run_watcher)
+
+        while True:
+            try:
+                msg_type, payload = await asyncio.wait_for(
+                    loop.run_in_executor(None, event_queue.get),
+                    timeout=300.0,
+                )
+            except asyncio.TimeoutError:
+                yield "event: error\ndata: timeout\n\n"
+                break
+            if msg_type == "done":
+                break
+            if msg_type == "step":
+                yield f"event: step\ndata: {json.dumps({'step': payload})}\n\n"
+            elif msg_type == "result":
+                yield f"event: result\ndata: {json.dumps(payload)}\n\n"
+                break
+            elif msg_type == "error":
+                yield f"event: error\ndata: {json.dumps({'message': payload})}\n\n"
+                break
+
+
+@app.post("/api/search/stream")
+async def search_stream(req: SearchRequest):
+    """Run Agent 1 with Server-Sent Events for real-time step progress."""
+    return StreamingResponse(
+        _search_stream_generator(req.company_name),
+        media_type="text/event-stream",
+        headers={
+            "Cache-Control": "no-cache",
+            "Connection": "keep-alive",
+            "X-Accel-Buffering": "no",
+        },
+    )
 
 
 class PrecedentsRequest(BaseModel):
