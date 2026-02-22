@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback, useRef, type MouseEvent } from 'react';
 import type { StrategyData, FrontendStrategy } from '../api';
+import AgentScene from './AgentScene';
 
 /* ─── Types ─── */
 
@@ -556,6 +557,16 @@ export default function StrategyPage({
                   </div>
                 </div>
               )}
+
+              {/* Agent Scene */}
+              <div className="mt-6">
+                <AgentScene
+                  scenario="strategy"
+                  completedSteps={completedSteps}
+                  activeStep={activeStep}
+                  isDone={completedSteps >= STRATEGY_AGENT_STEPS.length}
+                />
+              </div>
             </div>
           </aside>
 

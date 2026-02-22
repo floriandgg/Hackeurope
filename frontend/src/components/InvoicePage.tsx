@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import type { InvoiceData } from '../api';
+import AgentScene from './AgentScene';
 
 /* ─── Types ─── */
 
@@ -352,6 +353,16 @@ export default function InvoicePage({
                   </div>
                 </div>
               )}
+
+              {/* Agent Scene */}
+              <div className="mt-6">
+                <AgentScene
+                  scenario="invoice"
+                  completedSteps={completedSteps}
+                  activeStep={activeStep}
+                  isDone={completedSteps >= INVOICE_AGENT_STEPS.length}
+                />
+              </div>
             </div>
           </aside>
 
