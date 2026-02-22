@@ -11,8 +11,16 @@ from dateutil import parser as date_parser
 
 from src.graph.state import GraphState
 from src.clients.tavily_client import tavily_client, search_news
+from src.clients.jina_client import get_markdown_content
 from src.clients.llm_client import llm
-from src.shared.types import ArticleScores, SUBJECT_KEYS, SUBJECT_DISPLAY_NAMES
+from src.shared.types import (
+    ArticleScores,
+    ParagraphDecisions,
+    SUBJECT_KEYS,
+    SUBJECT_DISPLAY_NAMES,
+    SUBJECT_RISK_MULTIPLIERS,
+    SENTIMENT_WEIGHTS,
+)
 
 
 # Paywall indicators: content likely truncated behind a paywall (avoid footer phrases like "subscribe to newsletter")
@@ -31,6 +39,60 @@ _PAYWALL_PATTERNS = (
 )
 
 
+def _filter_content_to_article(title: str, content: str) -> str:
+    """
+    Keeps only paragraphs that belong to the article (by title).
+    Uses chunk-based selection: Gemini returns true/false per paragraph,
+    we keep only those marked true. Text is never rewritten — only filtered.
+    """
+    if not content or not content.strip() or len(content) < 100:
+        return content
+    if not llm:
+        return content
+
+    raw = (content or "").strip()[:8000]
+    paragraphs = [p.strip() for p in raw.split("\n\n") if p.strip()]
+
+    if not paragraphs:
+        return content
+    if len(paragraphs) == 1:
+        return content
+
+    BATCH_SIZE = 15
+    kept = []
+    structured_llm = llm.with_structured_output(ParagraphDecisions)
+
+    for start in range(0, len(paragraphs), BATCH_SIZE):
+        batch = paragraphs[start : start + BATCH_SIZE]
+        numbered = "\n\n".join(f"[{i+1}] {p}" for i, p in enumerate(batch))
+        prompt = f"""The article is titled: "{title[:200]}"
+
+Below are numbered paragraphs from a raw web page. Some belong to this article; others are comments, navigation, related articles, footers, or ads.
+
+For each paragraph [1] to [{len(batch)}], output true if it belongs to the article, false otherwise.
+Return exactly {len(batch)} booleans in order.
+
+Paragraphs:
+{numbered}
+"""
+        try:
+            result = structured_llm.invoke(prompt)
+            decisions = result.decisions if hasattr(result, "decisions") else []
+            if len(decisions) != len(batch):
+                kept.extend(batch)  # fallback: keep all if count mismatch
+            else:
+                for para, keep in zip(batch, decisions):
+                    if keep:
+                        kept.append(para)
+        except Exception as e:
+            print(f"[AGENT 1] Content filter error for '{title[:50]}...': {e}")
+            return content
+
+    if not kept:
+        return content
+    return "\n\n".join(kept)
+
+
 def _is_likely_paywalled(content: str) -> bool:
     """Returns True if the content suggests the article is behind a paywall."""
     if not content or not content.strip():
@@ -41,12 +103,12 @@ def _is_likely_paywalled(content: str) -> bool:
 
 def _recency_multiplier(pub_date_str: str | None) -> float:
     """
-    Computes recency multiplier per spec:
-    T < 2h  : 3.0 (Breaking News)
-    T < 24h : 1.0 (Active)
-    T < 48h : 0.5 (Cooling)
-    T > 48h : 0.1 (Archive)
-    If no date: 1.0
+    Computes recency multiplier (days-based, more gradual):
+    T < 2h   : 3.0 (Breaking News)
+    T < 3d   : 1.5 (Fresh)
+    T < 7d   : 1.2 (Recent)
+    T < 30d  : 1.0 (Current)
+    T > 30d  : 0.7 (Archive)
     """
     if not pub_date_str or not pub_date_str.strip():
         return 1.0
@@ -54,16 +116,23 @@ def _recency_multiplier(pub_date_str: str | None) -> float:
         pub = date_parser.parse(pub_date_str)
         pub_naive = pub.replace(tzinfo=None) if pub.tzinfo else pub
         delta = datetime.now() - pub_naive
-        hours = delta.total_seconds() / 3600
-        if hours < 2:
+        days = delta.total_seconds() / 86400
+        if days < 2 / 24:  # < 2h
             return 3.0
-        if hours < 24:
+        if days < 3:
+            return 1.5
+        if days < 7:
+            return 1.2
+        if days < 30:
             return 1.0
-        if hours < 48:
-            return 0.5
-        return 0.1
+        return 0.7
     except (ValueError, TypeError):
         return 1.0
+
+
+def _get_risk_multiplier(subject: str) -> float:
+    """Returns risk multiplier for subject (1.0 default)."""
+    return SUBJECT_RISK_MULTIPLIERS.get(subject.strip().lower(), 1.0)
 
 
 def _analyze_article_with_gemini(title: str, content: str, url: str) -> ArticleScores | None:
@@ -86,13 +155,14 @@ For this article, provide:
 4. **author**: Author name if visible in the excerpt, else empty string
 5. **authority_score**: Score 1-5 by source (5=international, 4=national, 3=specialized, 2=blog, 1=unknown)
 6. **severity_score**: Score 1-5 by severity (1=mild criticism, 2=ethical, 3=legal, 4=scandal, 5=criminal)
+7. **sentiment**: One of: negative (critical/unfavorable), neutral (balanced/factual), positive (favorable/promotional)
 
 Article:
 Title: {title}
 URL: {url}
 Excerpt: {content}
 
-Respond with is_substantive_article, summary, subject, author, authority_score and severity_score.
+Respond with is_substantive_article, summary, subject, author, authority_score, severity_score and sentiment.
 """.format(title=title[:200], url=url, content=(content or "")[:1500])
     try:
         return structured_llm.invoke(prompt)
@@ -125,9 +195,16 @@ def watcher_node(state: GraphState) -> dict:
     articles = []
     for r in raw_results:
         title = r.get("title", "")
-        content = r.get("content", "")
         url = r.get("url", "")
         pub_date = r.get("pub_date")
+
+        # Content: Jina Reader first (clean Markdown), fallback to Tavily + paragraph filter
+        content_from_jina = get_markdown_content(url)
+        if content_from_jina and len(content_from_jina.strip()) > 100:
+            content = content_from_jina
+        else:
+            content = r.get("content", "") or ""
+            content = _filter_content_to_article(title, content)
 
         # Skip paywalled articles — don't recommend based on teaser only
         if _is_likely_paywalled(content):
@@ -148,6 +225,7 @@ def watcher_node(state: GraphState) -> dict:
             author = ""
             authority_score = 3
             severity_score = 2
+            sentiment = "neutral"
         elif not getattr(scores, "is_substantive_article", True):
             print(f"[AGENT 1] Skipped (not substantive): {title[:60]}...")
             continue
@@ -157,12 +235,24 @@ def watcher_node(state: GraphState) -> dict:
             author = (scores.author or "").strip()[:200]
             authority_score = scores.authority_score
             severity_score = scores.severity_score
+            sentiment = getattr(scores, "sentiment", "neutral") or "neutral"
+            sentiment = sentiment.lower().strip()
+            if sentiment not in SENTIMENT_WEIGHTS:
+                sentiment = "neutral"
 
-        # C: Recency Multiplier
+        # C: Recency Multiplier (days-based)
         recency_mult = _recency_multiplier(pub_date)
 
         # D: Exposure Score formula
-        exposure_score = (authority_score * severity_score) * recency_mult
+        # base × risk_mult × recency × sentiment_weight (asymmetric: negative full, positive 0.1)
+        risk_mult = _get_risk_multiplier(subject)
+        sentiment_weight = SENTIMENT_WEIGHTS.get(sentiment, 0.5)
+        exposure_score = (
+            (authority_score * severity_score)
+            * risk_mult
+            * recency_mult
+            * sentiment_weight
+        )
 
         article = {
             "title": title,
@@ -172,13 +262,14 @@ def watcher_node(state: GraphState) -> dict:
             "pub_date": pub_date,
             "author": author,
             "subject": subject,
+            "sentiment": sentiment,
             "authority_score": authority_score,
             "severity_score": severity_score,
             "recency_multiplier": recency_mult,
             "exposure_score": round(exposure_score, 2),
         }
         articles.append(article)
-        print(f"[AGENT 1] Article found: {title[:60]} | Score: {article['exposure_score']}")
+        print(f"[AGENT 1] Article found: {title} | Score: {article['exposure_score']}")
 
     # Sort by Exposure Score descending
     articles.sort(key=lambda a: a["exposure_score"], reverse=True)
