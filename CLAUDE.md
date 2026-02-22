@@ -22,7 +22,8 @@ All commands run from the `frontend/` directory:
 
 ## Architecture
 
-The frontend lives entirely in `frontend/src/`. Data currently comes from mock sources; the backend will connect via WebSocket later.
+- **Frontend** : `frontend/src/` — React/Vite. Data comes from mock sources; backend connects via WebSocket later.
+- **Backend** : `backend/` — Python + LangGraph, 5 agents (Watcher, Precedents, Scorer, Strategist, CFO). See `backend/README.md` for orchestration.
 
 **User flow:** Landing page (company name input) → bubble transition → article discovery page (agent timeline + topic cards) → user picks a topic → expanded view with articles → "Respond to Topic" → strategy page (3 response strategies) → "See Why" → precedents page (historical case timeline) / "View Drafts" → draft viewer page (channel-specific response drafts + tone analysis).
 
