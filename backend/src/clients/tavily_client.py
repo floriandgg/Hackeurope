@@ -6,10 +6,11 @@ from pathlib import Path
 from tavily import TavilyClient
 from dotenv import load_dotenv
 
-# Load .env from backend/ or project root
+# Load .env (cwd, backend/, project root)
+_env_cwd = Path.cwd() / ".env"
 _env_backend = Path(__file__).resolve().parents[2] / ".env"
 _env_root = Path(__file__).resolve().parents[3] / ".env"
-load_dotenv(_env_backend) or load_dotenv(_env_root)
+load_dotenv(_env_cwd) or load_dotenv(_env_backend) or load_dotenv(_env_root)
 
 TAVILY_API_KEY = os.getenv("TAVILY_API_KEY")
 tavily_client = TavilyClient(api_key=TAVILY_API_KEY) if TAVILY_API_KEY else None

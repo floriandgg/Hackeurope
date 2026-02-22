@@ -12,10 +12,11 @@ from pathlib import Path
 from paid import Paid
 from dotenv import load_dotenv
 
-# Load .env from backend/ or project root
+# Load .env (cwd, backend/, project root)
+_env_cwd = Path.cwd() / ".env"
 _env_backend = Path(__file__).resolve().parents[2] / ".env"
 _env_root = Path(__file__).resolve().parents[3] / ".env"
-load_dotenv(_env_backend) or load_dotenv(_env_root)
+load_dotenv(_env_cwd) or load_dotenv(_env_backend) or load_dotenv(_env_root)
 
 # Paid client initialization
 PAID_API_KEY = os.getenv("PAID_API_KEY")

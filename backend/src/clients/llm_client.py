@@ -10,10 +10,11 @@ from pathlib import Path
 from dotenv import load_dotenv
 from langchain_google_genai import ChatGoogleGenerativeAI
 
-# Load .env from backend/ or project root
+# Load .env (cwd, backend/, project root)
+_env_cwd = Path.cwd() / ".env"
 _env_backend = Path(__file__).resolve().parents[2] / ".env"
 _env_root = Path(__file__).resolve().parents[3] / ".env"
-load_dotenv(_env_backend) or load_dotenv(_env_root)
+load_dotenv(_env_cwd) or load_dotenv(_env_backend) or load_dotenv(_env_root)
 
 GOOGLE_API_KEY = os.getenv("GOOGLE_API_KEY")
 
