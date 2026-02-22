@@ -149,9 +149,125 @@ function transformSubjects(subjects: BackendSubject[]): TopicGroup[] {
   }));
 }
 
+/* ─── Debug mock data ─── */
+
+const MOCK_TOPICS: TopicGroup[] = [
+  {
+    name: 'Security & Fraud',
+    summary:
+      'Leaked audit documents reveal systemic data protection failures across multiple divisions.',
+    articles: [
+      {
+        publisher: 'Reuters',
+        date: 'Feb 19, 2026',
+        title: 'Data Privacy Concerns Mount After Internal Audit Leak',
+        summary: 'Leaked audit documents reveal systemic data protection failures across multiple divisions.',
+        criticality: 9,
+        url: 'https://reuters.com/example',
+      },
+      {
+        publisher: 'TechCrunch',
+        date: 'Feb 16, 2026',
+        title: 'Product Safety Report Flags Critical Vulnerabilities',
+        summary: 'Independent researchers identify multiple unpatched vulnerabilities in flagship product.',
+        criticality: 8,
+        url: 'https://techcrunch.com/example',
+      },
+      {
+        publisher: 'Wired',
+        date: 'Feb 12, 2026',
+        title: 'AI Ethics Board Resignations Signal Internal Discord',
+        summary: 'Three board members step down over disagreements about AI deployment policies.',
+        criticality: 6,
+        url: 'https://wired.com/example',
+      },
+    ],
+  },
+  {
+    name: 'Legal & Compliance',
+    summary:
+      'Regulatory scrutiny, leadership instability, and declining financial performance raise investor concerns.',
+    articles: [
+      {
+        publisher: 'Financial Times',
+        date: 'Feb 18, 2026',
+        title: 'Regulatory Investigation Launched Over Market Practices',
+        summary: 'Federal regulators open inquiry into potentially anticompetitive business practices.',
+        criticality: 9,
+        url: 'https://ft.com/example',
+      },
+      {
+        publisher: 'The Wall Street Journal',
+        date: 'Feb 17, 2026',
+        title: 'Executive Leadership Shakeup Raises Governance Questions',
+        summary: 'Departure of two C-suite executives prompts investor concerns about stability.',
+        criticality: 8,
+        url: 'https://wsj.com/example',
+      },
+      {
+        publisher: 'Bloomberg',
+        date: 'Feb 15, 2026',
+        title: 'Quarterly Earnings Fall Short of Projections',
+        summary: 'Revenue missed consensus by 12%, marking the third disappointing quarter.',
+        criticality: 7,
+        url: 'https://bloomberg.com/example',
+      },
+      {
+        publisher: 'Associated Press',
+        date: 'Feb 14, 2026',
+        title: 'Employee Whistleblower Alleges Safety Issues',
+        summary: 'Former employee files complaint citing OSHA violations and management negligence.',
+        criticality: 7,
+        url: 'https://apnews.com/example',
+      },
+    ],
+  },
+  {
+    name: 'Ethics & Management',
+    summary:
+      'Supply chain disruptions and consumer backlash threaten brand reputation and operational continuity.',
+    articles: [
+      {
+        publisher: 'The Guardian',
+        date: 'Feb 13, 2026',
+        title: 'Environmental Compliance Violations Surface in Report',
+        summary: 'Investigation documents repeated violations at three manufacturing facilities.',
+        criticality: 6,
+        url: 'https://theguardian.com/example',
+      },
+      {
+        publisher: 'CNBC',
+        date: 'Feb 11, 2026',
+        title: 'Supply Chain Disruptions Threaten Product Launch',
+        summary: 'Key supplier bankruptcy creates uncertainty for product availability.',
+        criticality: 5,
+        url: 'https://cnbc.com/example',
+      },
+      {
+        publisher: 'The New York Times',
+        date: 'Feb 10, 2026',
+        title: 'Consumer Backlash Over Pricing Changes',
+        summary: 'Petition with 200K signatures demands reversal of recent price increases.',
+        criticality: 5,
+        url: 'https://nytimes.com/example',
+      },
+    ],
+  },
+];
+
+/** Debug mode: add ?debug to the URL to skip the backend and use mock data */
+const isDebug = typeof window !== 'undefined' && new URLSearchParams(window.location.search).has('debug');
+
 /* ─── API call ─── */
 
 export async function searchCompany(companyName: string): Promise<TopicGroup[]> {
+  if (isDebug) {
+    // Simulate network delay then return mock data
+    await new Promise((r) => setTimeout(r, 2500));
+    console.log(`[DEBUG MODE] Returning mock data for "${companyName}"`);
+    return MOCK_TOPICS;
+  }
+
   const res = await fetch('/api/search', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
