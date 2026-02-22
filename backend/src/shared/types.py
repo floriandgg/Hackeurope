@@ -61,12 +61,21 @@ class ArticleScores(BaseModel):
 
 # --- Agent 2: Input contract from Agent 1 ---
 
+class ArticleDetail(BaseModel):
+    """Minimal article info passed from Agent 1 to Agent 2."""
+    title: str
+    summary: str
+    severity_score: int = Field(ge=1, le=5)
+    subject: str = ""
+
+
 class Agent1Output(BaseModel):
     """Data extracted from Agent 1 state to feed Agent 2."""
     company_name: str
     crisis_summary: str
     severity_score: int = Field(ge=1, le=5)
     primary_threat_category: str
+    articles: List[ArticleDetail] = Field(default_factory=list)
 
 
 class HistoricalCrisis(BaseModel):
@@ -105,3 +114,40 @@ class ArticleTopicAndViral(BaseModel):
         ge=0.5, le=3.0,
         description="0.8=Low, 1.2=Neutral, 1.5=High, 2.5=Explosive"
     )
+
+
+# --- Agent 4: Strategist structured output ---
+
+
+class CrisisStrategy(BaseModel):
+    """One of the 3 strategies proposed by Agent 4."""
+    name: str = Field(description="Strategy name: 'Offensive', 'Diplomate', or 'Silence'")
+    description: str = Field(description="2-3 sentence description of the strategy approach")
+    tone: str = Field(description="Communication tone: e.g. 'Firm & Legal', 'Empathetic & Transparent', 'Minimal & Observant'")
+    channels: List[str] = Field(description="Communication channels to use, e.g. ['press_release', 'social_media', 'internal_email', 'legal_notice']")
+    key_actions: List[str] = Field(description="3-5 concrete actions to execute")
+    estimated_cost_eur: float = Field(ge=0, description="Estimated implementation cost in EUR")
+    estimated_impact: str = Field(description="Expected impact: e.g. 'Reduces VaR by ~40%, high legal risk'")
+    roi_score: int = Field(ge=1, le=10, description="ROI score 1-10 (10 = best return on investment)")
+
+
+class Agent4Output(BaseModel):
+    """Full structured output of Agent 4 (The Strategist)."""
+    alert_level: str = Field(description="One of: IGNORE, SOFT, MEDIUM, CRITICAL")
+    alert_reasoning: str = Field(description="1-2 sentences explaining why this alert level was chosen based on the data")
+    recommended_action: str = Field(description="Primary action: 'communicate', 'monitor_only', or 'legal_action'")
+
+    strategies: List[CrisisStrategy] = Field(
+        description="Exactly 3 strategies: Offensive (legal-focused), Diplomate (empathy+facts), Silence (minimize noise)",
+        min_length=3,
+        max_length=3,
+    )
+    recommended_strategy: str = Field(description="Name of the recommended strategy (must match one of the 3)")
+    recommendation_reasoning: str = Field(description="Why this strategy maximizes ROI given the data")
+
+    press_release: str = Field(description="Draft press release (formal, 150-300 words)")
+    internal_email: str = Field(description="Draft internal email to reassure employees (100-200 words)")
+    social_post: str = Field(description="Draft social media post (concise, <280 chars)")
+    legal_notice_draft: str = Field(default="", description="Draft legal notice / mise en demeure (only if alert_level is CRITICAL, else empty)")
+
+    decision_summary: str = Field(description="Human-readable summary of the decision logic applied (3-5 lines)")

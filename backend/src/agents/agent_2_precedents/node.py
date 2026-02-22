@@ -24,7 +24,7 @@ from langchain_google_genai import ChatGoogleGenerativeAI
 from src.graph.state import GraphState
 from src.clients.llm_client import llm_flash, llm_pro, GOOGLE_API_KEY
 from src.shared.types import (
-    Agent1Output, Agent2Output, HistoricalCrisis,
+    Agent1Output, Agent2Output, HistoricalCrisis, ArticleDetail,
     SUBJECT_DISPLAY_NAMES,
 )
 from src.utils.paid_helpers import emit_agent2_signal
@@ -59,9 +59,7 @@ def _retry_llm(fn, retries: int = MAX_LLM_RETRIES):
 def _build_agent1_output(state: GraphState) -> Agent1Output:
     """
     Build a rich Agent1Output from the full GraphState.
-    - Uses ALL article summaries, capped at 1500 chars
-    - Severity = max across all articles
-    - primary_threat_category from Agent 1's 'subject' field (most frequent)
+    Includes per-article detail so Agent 2 searches are maximally informed.
     """
     articles = state.get("articles", [])
     company_name = state.get("company_name", "Unknown")
@@ -72,6 +70,7 @@ def _build_agent1_output(state: GraphState) -> Agent1Output:
             crisis_summary="No crisis data available.",
             severity_score=1,
             primary_threat_category="Unknown",
+            articles=[],
         )
 
     max_severity = max(a.get("severity_score", 1) for a in articles)
@@ -83,22 +82,29 @@ def _build_agent1_output(state: GraphState) -> Agent1Output:
     else:
         category = _severity_to_category(max_severity)
 
-    summaries = []
-    total_len = 0
+    article_details: list[ArticleDetail] = []
     for a in articles:
-        s = a.get("summary") or a.get("title", "")
-        if total_len + len(s) > 1500:
-            break
-        summaries.append(s)
-        total_len += len(s) + 3
+        article_details.append(ArticleDetail(
+            title=a.get("title", ""),
+            summary=a.get("summary") or a.get("title", ""),
+            severity_score=a.get("severity_score", 1),
+            subject=a.get("subject", ""),
+        ))
 
-    crisis_summary = " | ".join(summaries)
+    structured_summary_parts = []
+    for i, ad in enumerate(article_details[:10], 1):
+        subj_display = SUBJECT_DISPLAY_NAMES.get(ad.subject, ad.subject)
+        structured_summary_parts.append(
+            f"Article {i} [{subj_display}, severity {ad.severity_score}/5]: {ad.summary}"
+        )
+    crisis_summary = "\n".join(structured_summary_parts)
 
     return Agent1Output(
         company_name=company_name,
         crisis_summary=crisis_summary,
         severity_score=max_severity,
         primary_threat_category=category,
+        articles=article_details,
     )
 
 
@@ -123,7 +129,9 @@ CURRENT CRISIS:
 - Company: {company_name}
 - Category: {primary_threat_category}
 - Severity: {severity_score}/5
-- Summary: {crisis_summary}
+
+KEY ARTICLES FROM TODAY'S NEWS:
+{crisis_summary}
 
 YOUR TASK: Search for and identify 5-8 SIMILAR historical corporate crises that \
 happened at OTHER companies (NOT {company_name}).
@@ -135,7 +143,8 @@ For each crisis you find, provide:
 - How severe it was (financial losses, reputational damage)
 
 SEARCH STRATEGY:
-- Search for crises in the same INDUSTRY and same TYPE (e.g. data breach, product recall, fraud, etc.)
+- Read the articles above carefully — they describe the EXACT nature of the crisis
+- Search for crises matching the SAME specific issues (e.g. if it's food contamination, search for food contamination cases)
 - Also search for crises of similar SEVERITY regardless of industry
 - Look for well-documented cases from HBR, WSJ, Forbes, Reuters, Bloomberg
 - Include both famous cases AND lesser-known but highly relevant ones
