@@ -11,6 +11,9 @@ SUBJECT_KEYS = (
     "security_fraud",
     "legal_compliance",
     "ethics_management",
+    "labor_relations",
+    "financial_performance",
+    "operational_incident",
     "product_bug",
     "customer_service",
 )
@@ -24,6 +27,9 @@ SUBJECT_DISPLAY_NAMES = {
     "security_fraud": "Security & Fraud",
     "legal_compliance": "Legal & Compliance",
     "ethics_management": "Ethics & Management",
+    "labor_relations": "Labor & Workforce",
+    "financial_performance": "Financial & Markets",
+    "operational_incident": "Operations & Incidents",
     "product_bug": "Product & Technical",
     "customer_service": "Customer Service",
 }
@@ -33,6 +39,9 @@ SUBJECT_RISK_MULTIPLIERS = {
     "security_fraud": 1.8,
     "legal_compliance": 1.5,
     "ethics_management": 1.8,
+    "labor_relations": 1.6,
+    "financial_performance": 1.4,
+    "operational_incident": 1.3,
     "product_bug": 1.2,
     "customer_service": 1.0,
 }
@@ -59,7 +68,12 @@ class ArticleScores(BaseModel):
             return v[:300]
         return v
     subject: str = Field(
-        description="One of: security_fraud, legal_compliance, ethics_management, product_bug, customer_service"
+        description="One of: security_fraud, legal_compliance, ethics_management, labor_relations, financial_performance, operational_incident, product_bug, customer_service"
+    )
+    sub_theme: str = Field(
+        default="",
+        max_length=80,
+        description="Short 2-6 word phrase for the specific angle (e.g. 'Layoff email blunder', 'Mass job cuts', 'CEO priorities backlash'). Invent a distinct angle to differentiate this article from others on similar topics.",
     )
     author: str = Field(
         default="",
@@ -134,6 +148,19 @@ class Agent2Output(BaseModel):
         default="medium",
         description="Confidence in the analysis: 'high', 'medium', or 'low'",
     )
+
+
+# --- Agent 1: Clustering output ---
+
+class ArticleCluster(BaseModel):
+    """One cluster of similar articles with a shared title."""
+    title: str = Field(description="Short 2-5 word title capturing the shared theme (e.g. 'Layoff Email Blunder', 'Mass Job Cuts')")
+    article_indices: List[int] = Field(description="0-based indices of articles in this cluster")
+
+
+class ArticleClusteringResult(BaseModel):
+    """Result of grouping N articles into thematic clusters."""
+    clusters: List[ArticleCluster] = Field(description="List of clusters, each with a title and article indices. Every article must appear in exactly one cluster.")
 
 
 # --- Agent 3: Gemini structured output for Topic + Virality ---

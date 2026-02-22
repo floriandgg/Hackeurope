@@ -35,6 +35,9 @@ TOPIC_WEIGHTS = {
     "security_fraud": 3.0,
     "legal_compliance": 2.0,
     "ethics_management": 1.5,
+    "labor_relations": 1.6,
+    "financial_performance": 1.4,
+    "operational_incident": 1.3,
     "product_bug": 1.0,
     "customer_service": 0.5,
 }
