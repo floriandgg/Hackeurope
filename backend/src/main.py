@@ -1,79 +1,186 @@
 """
-Entry point — LangGraph workflow orchestration.
+Entry point — Full pipeline test runner.
 
-Test Agent 1 only:
-    cd backend && PYTHONPATH=. python -m src.main Tesla
-
-Test Agent 1 + Agent 3 (pipeline):
-    cd backend && PYTHONPATH=. python -m src.main Tesla --agent3
+Usage:
+    cd backend
+    PYTHONPATH=. python -m src.main Tesla
+    PYTHONPATH=. python -m src.main "Volkswagen" --skip-agent2   # skip slow precedent search
 """
 import json
 import sys
+import time
 from pathlib import Path
+from concurrent.futures import ThreadPoolExecutor, as_completed
 
 from dotenv import load_dotenv
 
-# Load .env early — try multiple locations (cwd, backend/, project root)
 _env_cwd = Path.cwd() / ".env"
 _env_backend = Path(__file__).resolve().parents[1] / ".env"
 _env_root = Path(__file__).resolve().parents[2] / ".env"
 load_dotenv(_env_cwd) or load_dotenv(_env_backend) or load_dotenv(_env_root)
 
-# Ensure backend/ is in the path
 _backend = Path(__file__).resolve().parents[1]
 if str(_backend) not in sys.path:
     sys.path.insert(0, str(_backend))
 
 from src.agents.agent_1_watcher.node import watcher_node
+from src.agents.agent_2_precedents.node import precedents_node
 from src.agents.agent_3_scorer.node import scorer_node
+from src.agents.agent_4_strategist.node import strategist_node
+
+SEP = "=" * 80
+
+
+def _dump(label: str, data):
+    print(f"\n{SEP}")
+    print(f"  {label}")
+    print(SEP)
+    print(json.dumps(data, indent=2, default=str, ensure_ascii=False))
+    print(SEP)
 
 
 def main():
     args = [a for a in sys.argv[1:] if not a.startswith("--")]
-    run_agent3 = "--agent3" in sys.argv
+    skip_agent2 = "--skip-agent2" in sys.argv
     company = args[0] if args else "Tesla"
 
-    print(f"[MAIN] Starting Agent 1 (The Watcher) for: {company}\n")
-    state = watcher_node({"company_name": company})
-    print(f"\n[MAIN] Agent 1 done. {len(state.get('articles', []))} articles found.")
-    print("\n" + "=" * 70)
-    print("AGENT 1 OUTPUT — Articles with structure (title, summary, date, scoring)")
-    print("=" * 70)
+    state: dict = {"company_name": company}
+
+    # ── Agent 1 ─────────────────────────────────────────────
+    print(f"\n{'#' * 80}")
+    print(f"#  AGENT 1 — The Watcher  |  Company: {company}")
+    print(f"{'#' * 80}\n")
+    t0 = time.time()
+    result1 = watcher_node(state)
+    state.update(result1)
+    elapsed1 = time.time() - t0
+
+    print(f"\n[MAIN] Agent 1 done in {elapsed1:.1f}s — {len(state.get('articles', []))} articles found")
+
     for i, a in enumerate(state.get("articles", []), 1):
-        title = a.get("title", "") or ""
-        summary = a.get("summary", "") or ""
-        url = a.get("url", "") or ""
-        print(f"\n--- Article {i} ---")
-        print(f"  title:               {title}")
-        print(f"  summary:             {summary[:200] + ('...' if len(summary) > 200 else '')}")
-        print(f"  pub_date:            {a.get('pub_date') or 'N/A'}")
-        print(f"  author:              {a.get('author') or 'N/A'}")
-        print(f"  subject:             {a.get('subject') or 'N/A'}")
-        print(f"  authority_score:     {a.get('authority_score')}")
-        print(f"  severity_score:      {a.get('severity_score')}")
-        print(f"  recency_multiplier:  {a.get('recency_multiplier')}")
-        print(f"  exposure_score:      {a.get('exposure_score')}")
-        print(f"  url:                 {url[:70] + ('...' if len(url) > 70 else '')}")
-        content = a.get("content", "") or ""
-        if content:
-            print("  content (full, with line breaks):")
-            print("  " + "-" * 66)
-            for line in content.splitlines():
-                print(f"  {line}")
-            print("  " + "-" * 66)
-    print("\n" + "=" * 70)
-    print("Full JSON (for debugging):")
-    print(json.dumps(state, indent=2, default=str, ensure_ascii=False))
-    print("=" * 70 + "\n")
+        print(f"\n  --- Article {i} ---")
+        print(f"  Title:      {a.get('title', '')}")
+        print(f"  Subject:    {a.get('subject', '')}  |  Authority: {a.get('authority_score')}/5  |  Severity: {a.get('severity_score')}/5")
+        print(f"  Exposure:   {a.get('exposure_score')}  (recency x{a.get('recency_multiplier')})")
+        print(f"  Summary:    {(a.get('summary', '') or '')[:200]}")
+        print(f"  URL:        {a.get('url', '')}")
 
-    if run_agent3 and state.get("articles"):
-        print("\n[MAIN] Starting Agent 3 (Risk Analyst)...\n")
-        state = {**state, **scorer_node(state)}
-        print(f"\n[MAIN] Agent 3 done. total_var_impact: {state.get('total_var_impact', 0):,.2f}€")
-    elif run_agent3:
-        print("[MAIN] No articles, Agent 3 skipped.")
+    _dump("AGENT 1 — RAW STATE (articles + subjects)", {
+        "customer_id": state.get("customer_id"),
+        "crisis_id": state.get("crisis_id"),
+        "article_count": len(state.get("articles", [])),
+        "subject_count": len(state.get("subjects", [])),
+        "subjects": [
+            {"subject": s.get("subject"), "title": s.get("title"), "article_count": s.get("article_count")}
+            for s in state.get("subjects", [])
+        ],
+    })
 
-    print(f"[MAIN] crisis_id: {state.get('crisis_id')}, customer_id: {state.get('customer_id')}")
+    if not state.get("articles"):
+        print("\n[MAIN] No articles found. Pipeline stops here.")
+        return
+
+    # ── Agent 2 + Agent 3 (parallel) ───────────────────────
+    print(f"\n{'#' * 80}")
+    print(f"#  AGENT 2 (Precedents) {'[SKIPPED]' if skip_agent2 else ''} + AGENT 3 (Scorer)  —  Running {'sequentially' if skip_agent2 else 'in parallel'}...")
+    print(f"{'#' * 80}\n")
+
+    result2 = {}
+    result3 = {}
+    t0 = time.time()
+
+    if skip_agent2:
+        result3 = scorer_node(state)
+        result2 = {
+            "precedents": [],
+            "global_lesson": "(Agent 2 skipped)",
+            "confidence": "low",
+            "agent2_sources": [],
+        }
+    else:
+        with ThreadPoolExecutor(max_workers=2) as pool:
+            future2 = pool.submit(precedents_node, state)
+            future3 = pool.submit(scorer_node, state)
+            for f in as_completed([future2, future3]):
+                if f is future2:
+                    result2 = f.result()
+                    print(f"[MAIN] Agent 2 finished — {len(result2.get('precedents', []))} precedents")
+                else:
+                    result3 = f.result()
+                    print(f"[MAIN] Agent 3 finished — total VaR: {result3.get('total_var_impact', 0):,.2f}EUR")
+
+    state.update(result2)
+    state.update(result3)
+    elapsed23 = time.time() - t0
+
+    print(f"\n[MAIN] Agent 2 + 3 done in {elapsed23:.1f}s")
+
+    # Agent 2 output
+    _dump("AGENT 2 — PRECEDENTS", {
+        "global_lesson": state.get("global_lesson"),
+        "confidence": state.get("confidence"),
+        "precedents": state.get("precedents", []),
+        "sources_count": len(state.get("agent2_sources", [])),
+    })
+
+    # Agent 3 output
+    _dump("AGENT 3 — RISK SCORES", {
+        "total_var_impact": state.get("total_var_impact"),
+        "severity_score": state.get("severity_score"),
+        "articles_enriched": [
+            {
+                "title": a.get("title", "")[:60],
+                "reach_estimate": a.get("reach_estimate"),
+                "churn_risk_percent": a.get("churn_risk_percent"),
+                "value_at_risk": a.get("value_at_risk"),
+            }
+            for a in state.get("articles", [])
+        ],
+    })
+
+    # ── Agent 4 ─────────────────────────────────────────────
+    print(f"\n{'#' * 80}")
+    print(f"#  AGENT 4 — The Strategist")
+    print(f"{'#' * 80}\n")
+    t0 = time.time()
+    result4 = strategist_node(state)
+    state.update(result4)
+    elapsed4 = time.time() - t0
+
+    print(f"\n[MAIN] Agent 4 done in {elapsed4:.1f}s")
+
+    report = state.get("strategy_report", {})
+
+    _dump("AGENT 4 — DECISION", {
+        "alert_level": report.get("alert_level"),
+        "alert_reasoning": report.get("alert_reasoning"),
+        "recommended_action": report.get("recommended_action"),
+        "recommended_strategy": report.get("recommended_strategy"),
+        "recommendation_reasoning": report.get("recommendation_reasoning"),
+        "decision_summary": report.get("decision_summary"),
+    })
+
+    _dump("AGENT 4 — 3 STRATEGIES", report.get("strategies", []))
+
+    _dump("AGENT 4 — PRESS RELEASE", report.get("press_release", ""))
+    _dump("AGENT 4 — INTERNAL EMAIL", report.get("internal_email", ""))
+    _dump("AGENT 4 — SOCIAL POST", report.get("social_post", ""))
+    if report.get("legal_notice_draft"):
+        _dump("AGENT 4 — LEGAL NOTICE", report.get("legal_notice_draft", ""))
+
+    # ── Summary ─────────────────────────────────────────────
+    print(f"\n{'#' * 80}")
+    print(f"#  PIPELINE SUMMARY")
+    print(f"{'#' * 80}")
+    print(f"  Company:              {company}")
+    print(f"  Articles found:       {len(state.get('articles', []))}")
+    print(f"  Precedents found:     {len(state.get('precedents', []))}")
+    print(f"  Total VaR:            EUR {state.get('total_var_impact', 0):,.2f}")
+    print(f"  Alert Level:          {report.get('alert_level', 'N/A')}")
+    print(f"  Recommended Strategy: {report.get('recommended_strategy', 'N/A')}")
+    print(f"  Drafts Generated:     {state.get('drafts_generated', 0)}")
+    print(f"  Total time:           {elapsed1 + elapsed23 + elapsed4:.1f}s")
+    print(f"{'#' * 80}\n")
 
 
 if __name__ == "__main__":
