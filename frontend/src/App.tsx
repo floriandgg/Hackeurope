@@ -1,5 +1,263 @@
+import { useState, useEffect, useCallback, useRef } from 'react'
 import LandingPage from './components/LandingPage'
+import ArticleDiscoveryPage from './components/ArticleDiscoveryPage'
+import StrategyPage from './components/StrategyPage'
+import PrecedentsPage from './components/PrecedentsPage'
+import DraftViewerPage from './components/DraftViewerPage'
+import InvoicePage from './components/InvoicePage'
+import { searchCompany, fetchCrisisResponse, type TopicGroup, type PrecedentsData, type StrategyData, type InvoiceData } from './api'
+import { DEMO_DATA } from './data/demoData'
 
 export default function App() {
-  return <LandingPage />
+  const [view, setView] = useState<'landing' | 'discovery' | 'strategy' | 'precedents' | 'drafts' | 'invoice'>('landing')
+  const [companyName, setCompanyName] = useState('')
+  const [selectedTopic, setSelectedTopic] = useState<TopicGroup | null>(null)
+  const [selectedStrategy, setSelectedStrategy] = useState<number>(0)
+  const [isTransitioning, setIsTransitioning] = useState(false)
+  const [inputRect, setInputRect] = useState<DOMRect | null>(null)
+  const [bubbleExpanded, setBubbleExpanded] = useState(false)
+
+  // Agent 1 data
+  const [topicGroups, setTopicGroups] = useState<TopicGroup[]>([])
+  const [isLoading, setIsLoading] = useState(false)
+  const [searchError, setSearchError] = useState<string | null>(null)
+
+  // Agent 2 data
+  const [precedentsData, setPrecedentsData] = useState<PrecedentsData | null>(null)
+  const [precedentsLoading, setPrecedentsLoading] = useState(false)
+  const [precedentsError, setPrecedentsError] = useState<string | null>(null)
+
+  // Agent 4 data (strategy + drafts)
+  const [strategyData, setStrategyData] = useState<StrategyData | null>(null)
+  const [strategyLoading, setStrategyLoading] = useState(false)
+  const [strategyError, setStrategyError] = useState<string | null>(null)
+
+  // Agent 5 data (invoice)
+  const [invoiceData, setInvoiceData] = useState<InvoiceData | null>(null)
+
+  // Demo mode
+  const isDemoMode = useRef(false)
+  const demoCompanyKey = useRef<string | null>(null)
+
+  const handleSearch = useCallback((name: string, rect: DOMRect) => {
+    setCompanyName(name)
+    setInputRect(rect)
+    setIsTransitioning(true)
+    setTopicGroups([])
+    setSearchError(null)
+    setIsLoading(true)
+
+    // Fire the API call alongside the bubble transition
+    searchCompany(name)
+      .then((groups) => {
+        setTopicGroups(groups)
+        setIsLoading(false)
+      })
+      .catch((err) => {
+        console.error('Search failed:', err)
+        setSearchError(err instanceof Error ? err.message : 'Search failed')
+        setIsLoading(false)
+      })
+  }, [])
+
+  const handleDemoClick = useCallback((companyKey: string) => {
+    const demo = DEMO_DATA[companyKey]
+    if (!demo) return
+
+    isDemoMode.current = true
+    demoCompanyKey.current = companyKey
+    setCompanyName(demo.companyName)
+    setTopicGroups(demo.topicGroups)
+    setIsLoading(false)
+    setSearchError(null)
+    setView('discovery')
+  }, [])
+
+  useEffect(() => {
+    if (isTransitioning && inputRect) {
+      // Double rAF ensures the browser paints the initial position first
+      requestAnimationFrame(() => {
+        requestAnimationFrame(() => {
+          setBubbleExpanded(true)
+        })
+      })
+
+      const timer = setTimeout(() => {
+        setView('discovery')
+        setIsTransitioning(false)
+        setBubbleExpanded(false)
+        setInputRect(null)
+      }, 900)
+
+      return () => clearTimeout(timer)
+    }
+  }, [isTransitioning, inputRect])
+
+  const handleBack = useCallback(() => {
+    setView('landing')
+    setCompanyName('')
+    setSelectedTopic(null)
+    setPrecedentsData(null)
+    setPrecedentsError(null)
+    setStrategyData(null)
+    setStrategyError(null)
+    setInvoiceData(null)
+    isDemoMode.current = false
+    demoCompanyKey.current = null
+  }, [])
+
+  const handleRespondToTopic = useCallback((topic: TopicGroup) => {
+    setSelectedTopic(topic)
+    setView('strategy')
+    setStrategyError(null)
+    setPrecedentsError(null)
+
+    // Demo mode: load pre-cached data instantly
+    if (isDemoMode.current && demoCompanyKey.current) {
+      const demo = DEMO_DATA[demoCompanyKey.current]
+      const cached = demo?.topicResponses[topic.name]
+      if (cached) {
+        setStrategyData(cached.strategyData)
+        setPrecedentsData(cached.precedentsData)
+        setInvoiceData(cached.invoiceData)
+        setStrategyLoading(false)
+        return
+      }
+    }
+
+    // Normal API flow
+    setStrategyData(null)
+    setStrategyLoading(true)
+    setPrecedentsData(null)
+
+    fetchCrisisResponse(companyName, topic)
+      .then(({ strategyData: sd, precedentsData: pd, invoiceData: id }) => {
+        setStrategyData(sd)
+        setPrecedentsData(pd)
+        setInvoiceData(id)
+        setStrategyLoading(false)
+      })
+      .catch((err) => {
+        console.error('Crisis response failed:', err)
+        setStrategyError(err instanceof Error ? err.message : 'Failed to generate strategy')
+        setStrategyLoading(false)
+      })
+  }, [companyName])
+
+  const handleBackToDiscovery = useCallback(() => {
+    setView('discovery')
+    setSelectedTopic(null)
+    setPrecedentsData(null)
+    setPrecedentsError(null)
+    setStrategyData(null)
+    setStrategyError(null)
+    setInvoiceData(null)
+  }, [])
+
+  const handleViewDrafts = useCallback((strategyIndex: number) => {
+    setSelectedStrategy(strategyIndex)
+    setView('drafts')
+  }, [])
+
+  const handleSeeWhy = useCallback(() => {
+    // Precedents data is already loaded from the combined crisis-response call
+    setPrecedentsLoading(false)
+    setView('precedents')
+  }, [])
+
+  const handleViewInvoice = useCallback(() => {
+    setView('invoice')
+  }, [])
+
+  const handleBackToStrategy = useCallback(() => {
+    setView('strategy')
+  }, [])
+
+  return (
+    <>
+      {view === 'landing' && (
+        <div
+          style={{
+            opacity: isTransitioning ? 0 : 1,
+            transform: isTransitioning ? 'scale(0.98)' : 'scale(1)',
+            transition: 'opacity 0.6s ease-out, transform 0.6s ease-out',
+          }}
+        >
+          <LandingPage onSubmit={handleSearch} onDemoClick={handleDemoClick} />
+        </div>
+      )}
+
+      {/* Bubble transition overlay */}
+      {isTransitioning && inputRect && (
+        <div
+          className="fixed z-50 bg-white"
+          style={{
+            transition: 'all 0.85s cubic-bezier(0.65, 0, 0.35, 1)',
+            top: bubbleExpanded ? 0 : inputRect.top,
+            left: bubbleExpanded ? 0 : inputRect.left,
+            width: bubbleExpanded ? '100vw' : inputRect.width,
+            height: bubbleExpanded ? '100vh' : inputRect.height,
+            borderRadius: bubbleExpanded ? 0 : 16,
+            boxShadow: bubbleExpanded
+              ? 'none'
+              : '0 4px 30px rgba(43,58,143,0.08)',
+          }}
+        />
+      )}
+
+      {view === 'discovery' && (
+        <ArticleDiscoveryPage
+          companyName={companyName}
+          topicGroups={topicGroups}
+          isLoading={isLoading}
+          searchError={searchError}
+          onBack={handleBack}
+          onRespondToTopic={handleRespondToTopic}
+        />
+      )}
+
+      {view === 'strategy' && selectedTopic && (
+        <StrategyPage
+          companyName={companyName}
+          topic={selectedTopic}
+          strategyData={strategyData}
+          isLoading={strategyLoading}
+          searchError={strategyError}
+          onBack={handleBackToDiscovery}
+          onViewDrafts={handleViewDrafts}
+          onSeeWhy={handleSeeWhy}
+          onViewInvoice={handleViewInvoice}
+        />
+      )}
+
+      {view === 'precedents' && selectedTopic && (
+        <PrecedentsPage
+          companyName={companyName}
+          topic={selectedTopic}
+          precedentsData={precedentsData}
+          isLoading={precedentsLoading}
+          searchError={precedentsError}
+          onBack={handleBackToStrategy}
+        />
+      )}
+
+      {view === 'drafts' && selectedTopic && (
+        <DraftViewerPage
+          companyName={companyName}
+          topic={selectedTopic}
+          strategyIndex={selectedStrategy}
+          strategyData={strategyData}
+          onBack={handleBackToStrategy}
+        />
+      )}
+      {view === 'invoice' && selectedTopic && (
+        <InvoicePage
+          companyName={companyName}
+          topic={selectedTopic}
+          invoiceData={invoiceData}
+          onBack={handleBackToStrategy}
+        />
+      )}
+    </>
+  )
 }

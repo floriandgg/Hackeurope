@@ -1,0 +1,160 @@
+{
+  "company_name": "Tesla",
+  "crisis_id": "7648b4ff-d93f-4cd4-b473-8300e36144c5",
+  "subjects": [
+    {
+      "subject": "ethics_management",
+      "title": "Ethics & Management",
+      "summary": "The article criticizes Tesla CEO Elon Musk for his public behavior and newly revealed ties to the Epstein scandal, which are severely damaging the Tesla brand and negatively impacting EV sales. It suggests Musk's actions are a \"cascade of self-owns\" that have tainted the company's image.",
+      "article_count": 5,
+      "articles": [
+        {
+          "title": "Tesla CEO Elon Musk Should Stop Flinging Poop And Start Selling More Tesla EVs, STAT - CleanTechnica",
+          "summary": "The article criticizes Tesla CEO Elon Musk for his public behavior and newly revealed ties to the Epstein scandal, which are severely damaging the Tesla brand and negatively impacting EV sales. It suggests Musk's actions are a \"cascade of self-owns\" that have tainted the company's image.",
+          "url": "https://cleantechnica.com/2026/02/15/tesla-ceo-elon-musk-should-stop-flinging-poop-and-start-selling-more-tesla-evs-stat/amp/",
+          "pub_date": "Sun, 15 Feb 2026 14:45:22 GMT",
+          "author": "Tina Casey",
+          "subject": "ethics_management",
+          "sentiment": "negative",
+          "authority_score": 3,
+          "severity_score": 4,
+          "recency_multiplier": 1.2,
+          "exposure_score": 25.92
+        },
+        {
+          "title": "Musk Says This About Tesla's Cybercab, Optimus, Makes Claim About Epstein And Tesla Stock - Investor's Business Daily",
+          "summary": "Elon Musk claimed on X that Jeffrey Epstein, after being ghosted by Musk, initiated a campaign to short Tesla stock, allegedly involving Bill Gates. The article also notes that both Elon and Kimbal Musk had previous contact with Epstein, with Elon attempting to visit him in 2012-2013. Additionally, ",
+          "url": "https://www.investors.com/news/tesla-stock-elon-musk-epstein-claims-cybercab-optimus/",
+          "pub_date": "Tue, 17 Feb 2026 13:34:33 GMT",
+          "author": "",
+          "subject": "ethics_management",
+          "sentiment": "neutral",
+          "authority_score": 4,
+          "severity_score": 4,
+          "recency_multiplier": 1.2,
+          "exposure_score": 17.28
+        },
+        {
+          "title": "'I Bought This Before Elon Went Crazy' Bumper Stickers Won’t Work on the New $60,000 Cybertruck - Gizmodo",
+          "summary": "Elon Musk's political activism has significantly impacted Tesla's sales, with studies from Yale and Nature estimating a loss of over 1 million vehicle sales due to alienated liberal consumers. His support for Trump did not boost conservative interest, contributing to a 48% decline in Cybertruck sale",
+          "url": "https://gizmodo.com/i-bought-this-before-elon-went-crazy-bumper-stickers-wont-work-on-the-new-60000-cybertruck-2000724535",
+          "pub_date": "Fri, 20 Feb 2026 16:45:51 GMT",
+          "author": "Bruce Gil",
+          "subject": "ethics_management",
+          "sentiment": "negative",
+          "authority_score": 3,
+          "severity_score": 2,
+          "recency_multiplier": 1.5,
+          "exposure_score": 16.2
+        },
+        {
+          "title": "How the media keeps manufacturing Elon Musk's \"Genius\" - Boing Boing",
+          "summary": "The article criticizes how American media consistently portrays Elon Musk as a \"supergenius\" despite his history of missed deadlines and broken promises. It highlights how outlets amplify his claims, like shifting focus from Mars to AI satellite factories on the moon, without critical scrutiny, sugg",
+          "url": "https://boingboing.net/2026/02/17/how-the-media-keeps-manufacturing-elon-musks-genius.html",
+          "pub_date": "Tue, 17 Feb 2026 22:00:08 GMT",
+          "author": "Karl Bode",
+          "subject": "ethics_management",
+          "sentiment": "negative",
+          "authority_score": 3,
+          "severity_score": 2,
+          "recency_multiplier": 1.2,
+          "exposure_score": 12.96
+        },
+        {
+          "title": "Tesla Stock Slides After Musk Launches Cheaper Cybertruck. There’s a Concern. - Barron's",
+          "summary": "Tesla's stock edged higher on Friday following the launch of a cheaper Cybertruck, but concerns remain due to a significant decline in Cybertruck sales in 2025 compared to 2024.",
+          "url": "https://www.barrons.com/articles/tesla-stock-musk-cybertruck-launch-f8a83d96",
+          "pub_date": "Fri, 20 Feb 2026 12:04:00 GMT",
+          "author": "Al Root",
+          "subject": "ethics_management",
+          "sentiment": "negative",
+          "authority_score": 4,
+          "severity_score": 1,
+          "recency_multiplier": 1.5,
+          "exposure_score": 10.8
+        }
+      ]
+    },
+    {
+      "subject": "legal_compliance",
+      "title": "Legal & Compliance",
+      "summary": "Tesla has reportedly stopped using \"Autopilot\" as a marketing term in California to comply with the DMV's consumer protection regulations, avoiding a potential 30-day suspension. This follows a previous change from \"Full Self-Driving\" to \"Full Self-Driving (Supervised).\" Consumer Reports has also cr",
+      "article_count": 2,
+      "articles": [
+        {
+          "title": "Tesla Relents, Reportedly Stops Using the Term ‘Autopilot’ in California - Gizmodo",
+          "summary": "Tesla has reportedly stopped using \"Autopilot\" as a marketing term in California to comply with the DMV's consumer protection regulations, avoiding a potential 30-day suspension. This follows a previous change from \"Full Self-Driving\" to \"Full Self-Driving (Supervised).\" Consumer Reports has also cr",
+          "url": "https://gizmodo.com/tesla-relents-reportedly-stops-using-the-term-autopilot-in-california-2000723253",
+          "pub_date": "Wed, 18 Feb 2026 04:23:50 GMT",
+          "author": "Mike Pearl",
+          "subject": "legal_compliance",
+          "sentiment": "negative",
+          "authority_score": 4,
+          "severity_score": 3,
+          "recency_multiplier": 1.2,
+          "exposure_score": 21.6
+        },
+        {
+          "title": "Tesla avoids suspension by California regulator after corrective marketing changes - Yahoo Finance",
+          "summary": "Tesla has avoided a 30-day suspension of its dealer and manufacturer licenses in California after the DMV accused it of misleading consumers with the terms \"autopilot\" and \"Full Self-Driving.\" The company made corrective marketing changes, including stopping the use of \"autopilot\" in its California ",
+          "url": "https://finance.yahoo.com/news/tesla-avoids-suspension-california-regulator-014346884.html",
+          "pub_date": "Wed, 18 Feb 2026 01:43:00 GMT",
+          "author": "Natalia Bueno Rebolledo",
+          "subject": "legal_compliance",
+          "sentiment": "neutral",
+          "authority_score": 5,
+          "severity_score": 3,
+          "recency_multiplier": 1.2,
+          "exposure_score": 13.5
+        }
+      ]
+    },
+    {
+      "subject": "product_bug",
+      "title": "Product & Technical",
+      "summary": "Tesla's robotaxis are reportedly experiencing crash rates significantly higher than those of human drivers. This raises concerns about the safety and reliability of the autonomous driving technology.",
+      "article_count": 3,
+      "articles": [
+        {
+          "title": "Tesla robotaxis reporting crash rates far higher than humans - Automotive World",
+          "summary": "Tesla's robotaxis are reportedly experiencing crash rates significantly higher than those of human drivers. This raises concerns about the safety and reliability of the autonomous driving technology.",
+          "url": "https://www.automotiveworld.com/news/tesla-robotaxis-reporting-crash-rates-far-higher-than-humans/",
+          "pub_date": "Wed, 18 Feb 2026 09:42:50 GMT",
+          "author": "",
+          "subject": "product_bug",
+          "sentiment": "negative",
+          "authority_score": 3,
+          "severity_score": 3,
+          "recency_multiplier": 1.2,
+          "exposure_score": 12.96
+        },
+        {
+          "title": "Tesla’s Austin robotaxis involved in 14 crashes in first 8 months - Automotive News",
+          "summary": "Tesla's robotaxis operating in Austin, Texas, have been involved in 14 crashes within their first eight months of operation. This report highlights safety concerns regarding the autonomous vehicle technology.",
+          "url": "https://www.autonews.com/manufacturing/an-tesla-robotaxis-crashes-austin-texas-0218/",
+          "pub_date": "Wed, 18 Feb 2026 22:18:00 GMT",
+          "author": "Douglas A. Bolduc",
+          "subject": "product_bug",
+          "sentiment": "negative",
+          "authority_score": 3,
+          "severity_score": 3,
+          "recency_multiplier": 1.2,
+          "exposure_score": 12.96
+        },
+        {
+          "title": "Tesla Stock Pops After Musk Delivers on Cybercab. It Got Another Self-Driving Boost. - Barron's",
+          "summary": "Tesla's stock rose after CEO Elon Musk delivered on his promise to begin production of the Cybercab robo-taxi, a rare instance of him meeting a timeline. This positive development boosted the company's self-driving initiatives.",
+          "url": "https://www.barrons.com/articles/tesla-stock-price-musk-cybercab-9e8a08ed?gaa_at=eafs&gaa_n=AWEtsqdfDQKv6kEfSYdGuYx-p8ol0yaDLKyfRDcUY6btflReWhJG-A5866Ev&gaa_ts=6995c9ec&gaa_sig=gZDw5j6Fba9qrHIRBe_TtBADcFQ0ijmSkidm5GbphGkME1m0HMNLKo6HjcU5fofZZFOAl4BEZA8NBUAzoGE0YA%3D%3D",
+          "pub_date": "Wed, 18 Feb 2026 12:16:00 GMT",
+          "author": "Al Root",
+          "subject": "product_bug",
+          "sentiment": "positive",
+          "authority_score": 4,
+          "severity_score": 1,
+          "recency_multiplier": 1.2,
+          "exposure_score": 0.58
+        }
+      ]
+    }
+  ]
+}
