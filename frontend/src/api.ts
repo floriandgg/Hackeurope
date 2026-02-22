@@ -321,6 +321,17 @@ interface BackendStrategyReport {
   decision_summary: string;
 }
 
+/** Hijacker result from Agent 6 as returned by the backend */
+interface BackendHijackerResult {
+  live_url: string;
+  html_generated: boolean;
+  deployed: boolean;
+  ads_simulated: boolean;
+  ads_keywords: number;
+  ads_budget_eur: number;
+  api_cost_eur: number;
+}
+
 /** Full response from POST /api/crisis-response */
 export interface CrisisResponseResponse {
   strategy_report: BackendStrategyReport;
@@ -329,6 +340,18 @@ export interface CrisisResponseResponse {
   global_lesson: string;
   confidence: string;
   invoice?: BackendInvoice;
+  hijacker?: BackendHijackerResult;
+}
+
+/** Frontend-ready Agent 6 data */
+export interface HijackerData {
+  liveUrl: string;
+  htmlGenerated: boolean;
+  deployed: boolean;
+  adsSimulated: boolean;
+  adsKeywords: number;
+  adsBudgetEur: number;
+  apiCostEur: number;
 }
 
 /** Frontend-ready strategy (one of 3) */
@@ -390,6 +413,20 @@ export function transformStrategyReport(data: CrisisResponseResponse): StrategyD
       legalNotice: r.legal_notice_draft || '',
     },
     decisionSummary: r.decision_summary || '',
+  };
+}
+
+/* ─── Transform: Agent 6 ─── */
+
+export function transformHijacker(data: BackendHijackerResult): HijackerData {
+  return {
+    liveUrl: data.live_url || '',
+    htmlGenerated: data.html_generated || false,
+    deployed: data.deployed || false,
+    adsSimulated: data.ads_simulated || false,
+    adsKeywords: data.ads_keywords || 0,
+    adsBudgetEur: data.ads_budget_eur || 0,
+    apiCostEur: data.api_cost_eur || 0,
   };
 }
 
@@ -724,7 +761,98 @@ const MOCK_INVOICE_DATA: InvoiceData = {
 /** Debug mode: add ?debug to the URL to skip the backend and use mock data */
 const isDebug = typeof window !== 'undefined' && new URLSearchParams(window.location.search).has('debug');
 
+/** Step IDs from backend (order matches AGENT_STEPS in ArticleDiscoveryPage) */
+export const SEARCH_STEP_IDS = [
+  'initializing',
+  'scanning_news',
+  'analyzing_sentiment',
+  'cross_referencing',
+  'evaluating_criticality',
+  'compiling_results',
+] as const;
+
+export function stepIdToIndex(stepId: string): number {
+  const i = SEARCH_STEP_IDS.indexOf(stepId as (typeof SEARCH_STEP_IDS)[number]);
+  return i >= 0 ? i : 0;
+}
+
 /* ─── API calls ─── */
+
+export type SearchStreamOptions = {
+  onStep?: (stepId: string, completedCount: number) => void;
+};
+
+export async function searchCompanyStream(
+  companyName: string,
+  options?: SearchStreamOptions,
+): Promise<TopicGroup[]> {
+  if (isDebug) {
+    await new Promise((r) => setTimeout(r, 2500));
+    console.log(`[DEBUG MODE] Returning mock data for "${companyName}"`);
+    return MOCK_TOPICS;
+  }
+
+  const res = await fetch('/api/search/stream', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ company_name: companyName }),
+  });
+
+  if (!res.ok) {
+    throw new Error(`Search failed: ${res.status} ${res.statusText}`);
+  }
+
+  const reader = res.body?.getReader();
+  if (!reader) throw new Error('No response body');
+
+  const decoder = new TextDecoder();
+  let buffer = '';
+
+  return new Promise((resolve, reject) => {
+    function processChunk() {
+      reader.read().then(({ done, value }) => {
+        if (done) {
+          reject(new Error('Stream ended without result'));
+          return;
+        }
+        buffer += decoder.decode(value, { stream: true });
+        const lines = buffer.split('\n');
+        buffer = lines.pop() ?? '';
+
+        let eventType = '';
+        let eventData = '';
+
+        for (const line of lines) {
+          if (line.startsWith('event:')) {
+            eventType = line.slice(6).trim();
+          } else if (line.startsWith('data:')) {
+            eventData = line.slice(5).trim();
+          } else if (line === '' && eventType && eventData) {
+            try {
+              const data = JSON.parse(eventData);
+              if (eventType === 'step' && data.step) {
+                const idx = stepIdToIndex(data.step);
+                options?.onStep?.(data.step, idx + 1);
+              } else if (eventType === 'result') {
+                resolve(transformSubjects(data.subjects));
+                return;
+              } else if (eventType === 'error') {
+                reject(new Error(data.message || 'Search failed'));
+                return;
+              }
+            } catch {
+              // ignore parse errors for non-JSON events
+            }
+            eventType = '';
+            eventData = '';
+          }
+        }
+        processChunk();
+      }).catch(reject);
+    }
+    processChunk();
+  });
+}
 
 export async function searchCompany(companyName: string): Promise<TopicGroup[]> {
   if (isDebug) {
@@ -782,11 +910,11 @@ export async function fetchPrecedents(companyName: string, topic: TopicGroup): P
 export async function fetchCrisisResponse(
   companyName: string,
   topic: TopicGroup,
-): Promise<{ strategyData: StrategyData; precedentsData: PrecedentsData; invoiceData: InvoiceData | null }> {
+): Promise<{ strategyData: StrategyData; precedentsData: PrecedentsData; invoiceData: InvoiceData | null; hijackerData: HijackerData | null }> {
   if (isDebug) {
     await new Promise((r) => setTimeout(r, 5000));
     console.log(`[DEBUG MODE] Returning mock crisis response for "${topic.name}"`);
-    return { strategyData: MOCK_STRATEGY_DATA, precedentsData: MOCK_PRECEDENTS, invoiceData: MOCK_INVOICE_DATA };
+    return { strategyData: MOCK_STRATEGY_DATA, precedentsData: MOCK_PRECEDENTS, invoiceData: MOCK_INVOICE_DATA, hijackerData: null };
   }
 
   const res = await fetch('/api/crisis-response', {
@@ -818,5 +946,6 @@ export async function fetchCrisisResponse(
       confidence: data.confidence,
     }),
     invoiceData: data.invoice ? transformInvoice(data.invoice) : null,
+    hijackerData: data.hijacker ? transformHijacker(data.hijacker) : null,
   };
 }

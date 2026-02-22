@@ -246,6 +246,9 @@ interface ArticleDiscoveryPageProps {
   topicGroups: TopicGroup[];
   isLoading: boolean;
   searchError: string | null;
+  completedSteps?: number;
+  activeStep?: number;
+  useStreamingSteps?: boolean;
   onBack: () => void;
   onRespondToTopic: (topic: TopicGroup) => void;
 }
@@ -255,69 +258,70 @@ export default function ArticleDiscoveryPage({
   topicGroups,
   isLoading,
   searchError,
+  completedSteps: completedStepsProp = 0,
+  activeStep: activeStepProp = 0,
+  useStreamingSteps = false,
   onBack,
   onRespondToTopic,
 }: ArticleDiscoveryPageProps) {
-  const [completedSteps, setCompletedSteps] = useState(0);
-  const [activeStep, setActiveStep] = useState(0);
+  const [timerCompletedSteps, setTimerCompletedSteps] = useState(0);
+  const [timerActiveStep, setTimerActiveStep] = useState(0);
   const [visibleTopics, setVisibleTopics] = useState(0);
   const [showSummary, setShowSummary] = useState(false);
   const [selectedTopic, setSelectedTopic] = useState<number | null>(null);
   const [expandRect, setExpandRect] = useState<ExpandRect | null>(null);
   const [expandPhase, setExpandPhase] = useState<ExpandPhase>('idle');
 
+  const completedSteps = useStreamingSteps ? completedStepsProp : timerCompletedSteps;
+  const activeStep = useStreamingSteps ? activeStepProp : timerActiveStep;
+
   const cardRefs = useRef<(HTMLDivElement | null)[]>([]);
   const contentAreaRef = useRef<HTMLDivElement>(null);
 
-  // Animate agent steps while loading — progressive delays so the timeline
-  // doesn't finish long before the API returns (typically 15–40s).
+  // Timer-based steps (demo mode or fallback) — only when not using streaming
   useEffect(() => {
+    if (useStreamingSteps) return;
     const timers: ReturnType<typeof setTimeout>[] = [];
 
     if (isLoading) {
-      const stepsToAnimate = AGENT_STEPS.length - 1; // hold the last step for data arrival
-      // Progressive delays: 1s, 3.5s, 7.5s, 13s, 20s — later steps feel heavier
+      const stepsToAnimate = AGENT_STEPS.length - 1;
       const cumulativeDelays = [1000, 3500, 7500, 13000, 20000];
       for (let i = 0; i < stepsToAnimate; i++) {
         const delay = cumulativeDelays[i] ?? (i + 1) * 4000;
-        timers.push(setTimeout(() => setActiveStep(i), delay));
-        timers.push(setTimeout(() => setCompletedSteps(i + 1), delay + 600));
+        timers.push(setTimeout(() => setTimerActiveStep(i), delay));
+        timers.push(setTimeout(() => setTimerCompletedSteps(i + 1), delay + 600));
       }
     }
 
     return () => timers.forEach(clearTimeout);
-  }, [isLoading]);
+  }, [isLoading, useStreamingSteps]);
 
   // When data arrives, complete the last step and reveal topics
   useEffect(() => {
     if (!isLoading && topicGroups.length > 0) {
       const timers: ReturnType<typeof setTimeout>[] = [];
-
-      // If data arrived before any steps animated (pre-loaded / demo mode),
-      // rapid-fire steps 0–4 first so the timeline doesn't stay gray.
-      const preloaded = completedSteps === 0;
-      const rapidDelay = 150; // ms per step
+      const preloaded = (useStreamingSteps ? completedStepsProp : timerCompletedSteps) === 0;
+      const rapidDelay = 150;
       let baseOffset = 0;
 
-      if (preloaded) {
+      if (!useStreamingSteps && preloaded) {
         const stepsToAnimate = AGENT_STEPS.length - 1;
         for (let i = 0; i < stepsToAnimate; i++) {
-          timers.push(setTimeout(() => setActiveStep(i), i * rapidDelay));
-          timers.push(setTimeout(() => setCompletedSteps(i + 1), i * rapidDelay + 100));
+          timers.push(setTimeout(() => setTimerActiveStep(i), i * rapidDelay));
+          timers.push(setTimeout(() => setTimerCompletedSteps(i + 1), i * rapidDelay + 100));
         }
         baseOffset = stepsToAnimate * rapidDelay;
       }
 
-      // Complete final agent step
-      timers.push(setTimeout(() => setActiveStep(AGENT_STEPS.length - 1), baseOffset + 100));
-      timers.push(setTimeout(() => setCompletedSteps(AGENT_STEPS.length), baseOffset + 400));
+      if (!useStreamingSteps) {
+        timers.push(setTimeout(() => setTimerActiveStep(AGENT_STEPS.length - 1), baseOffset + 100));
+        timers.push(setTimeout(() => setTimerCompletedSteps(AGENT_STEPS.length), baseOffset + 400));
+      }
 
-      // Reveal topic cards with stagger
       topicGroups.forEach((_, i) => {
         timers.push(setTimeout(() => setVisibleTopics(i + 1), baseOffset + 600 + i * 500));
       });
 
-      // Show summary after all topics revealed
       timers.push(
         setTimeout(
           () => setShowSummary(true),
@@ -328,7 +332,7 @@ export default function ArticleDiscoveryPage({
       return () => timers.forEach(clearTimeout);
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isLoading, topicGroups]);
+  }, [isLoading, topicGroups, useStreamingSteps]);
 
   /* ─ FLIP expansion: measure card → set start → expand ─ */
 

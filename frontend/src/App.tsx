@@ -5,7 +5,7 @@ import StrategyPage from './components/StrategyPage'
 import PrecedentsPage from './components/PrecedentsPage'
 import DraftViewerPage from './components/DraftViewerPage'
 import InvoicePage from './components/InvoicePage'
-import { searchCompany, fetchCrisisResponse, type TopicGroup, type PrecedentsData, type StrategyData, type InvoiceData } from './api'
+import { searchCompanyStream, fetchCrisisResponse, type TopicGroup, type PrecedentsData, type StrategyData, type InvoiceData, type HijackerData } from './api'
 import { DEMO_DATA } from './data/demoData'
 
 export default function App() {
@@ -21,6 +21,8 @@ export default function App() {
   const [topicGroups, setTopicGroups] = useState<TopicGroup[]>([])
   const [isLoading, setIsLoading] = useState(false)
   const [searchError, setSearchError] = useState<string | null>(null)
+  const [completedSteps, setCompletedSteps] = useState(0)
+  const [activeStep, setActiveStep] = useState(0)
 
   // Agent 2 data
   const [precedentsData, setPrecedentsData] = useState<PrecedentsData | null>(null)
@@ -35,6 +37,9 @@ export default function App() {
   // Agent 5 data (invoice)
   const [invoiceData, setInvoiceData] = useState<InvoiceData | null>(null)
 
+  // Agent 6 data (narrative hijacker — Vercel live URL)
+  const [hijackerData, setHijackerData] = useState<HijackerData | null>(null)
+
   // Demo mode
   const isDemoMode = useRef(false)
   const demoCompanyKey = useRef<string | null>(null)
@@ -46,11 +51,20 @@ export default function App() {
     setTopicGroups([])
     setSearchError(null)
     setIsLoading(true)
+    setCompletedSteps(0)
+    setActiveStep(0)
 
-    // Fire the API call alongside the bubble transition
-    searchCompany(name)
+    // Use streaming API for real step progress
+    searchCompanyStream(name, {
+      onStep: (_stepId, completedCount) => {
+        setCompletedSteps(completedCount)
+        setActiveStep(Math.min(completedCount, 5))
+      },
+    })
       .then((groups) => {
         setTopicGroups(groups)
+        setCompletedSteps(6)
+        setActiveStep(5)
         setIsLoading(false)
       })
       .catch((err) => {
@@ -102,6 +116,9 @@ export default function App() {
     setStrategyData(null)
     setStrategyError(null)
     setInvoiceData(null)
+    setHijackerData(null)
+    setCompletedSteps(0)
+    setActiveStep(0)
     isDemoMode.current = false
     demoCompanyKey.current = null
   }, [])
@@ -131,10 +148,11 @@ export default function App() {
     setPrecedentsData(null)
 
     fetchCrisisResponse(companyName, topic)
-      .then(({ strategyData: sd, precedentsData: pd, invoiceData: id }) => {
+      .then(({ strategyData: sd, precedentsData: pd, invoiceData: id, hijackerData: hd }) => {
         setStrategyData(sd)
         setPrecedentsData(pd)
         setInvoiceData(id)
+        setHijackerData(hd)
         setStrategyLoading(false)
       })
       .catch((err) => {
@@ -152,6 +170,7 @@ export default function App() {
     setStrategyData(null)
     setStrategyError(null)
     setInvoiceData(null)
+    setHijackerData(null)
   }, [])
 
   const handleViewDrafts = useCallback((strategyIndex: number) => {
@@ -211,6 +230,9 @@ export default function App() {
           topicGroups={topicGroups}
           isLoading={isLoading}
           searchError={searchError}
+          completedSteps={completedSteps}
+          activeStep={activeStep}
+          useStreamingSteps={!isDemoMode.current}
           onBack={handleBack}
           onRespondToTopic={handleRespondToTopic}
         />
@@ -223,6 +245,7 @@ export default function App() {
           strategyData={strategyData}
           isLoading={strategyLoading}
           searchError={strategyError}
+          hijackerData={hijackerData}
           onBack={handleBackToDiscovery}
           onViewDrafts={handleViewDrafts}
           onSeeWhy={handleSeeWhy}

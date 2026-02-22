@@ -1,5 +1,5 @@
 /**
- * Pre-cached demo data for 3 showcase companies.
+ * Pre-cached demo data for showcase companies (OpenAI, Tesla).
  *
  * Raw JSON files are captured by `scripts/capture-demo-data.py` and stored in
  * `frontend/src/data/raw/`. This module imports them at build time and

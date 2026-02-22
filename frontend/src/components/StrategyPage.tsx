@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback, useRef, type MouseEvent } from 'react';
-import type { StrategyData, FrontendStrategy } from '../api';
+import type { StrategyData, FrontendStrategy, HijackerData } from '../api';
 import AgentScene from './AgentScene';
 
 /* ─── Types ─── */
@@ -15,6 +15,7 @@ interface StrategyPageProps {
   strategyData: StrategyData | null;
   isLoading: boolean;
   searchError: string | null;
+  hijackerData?: HijackerData | null;
   onBack: () => void;
   onViewDrafts: (strategyIndex: number) => void;
   onSeeWhy: () => void;
@@ -292,6 +293,7 @@ export default function StrategyPage({
   strategyData,
   isLoading,
   searchError,
+  hijackerData,
   onBack,
   onViewDrafts,
   onSeeWhy,
@@ -705,6 +707,55 @@ export default function StrategyPage({
                     {strategyData?.decisionSummary}
                   </p>
                 </div>
+
+                {/* Agent 6 — Generate Report Online button */}
+                {hijackerData?.deployed && hijackerData.liveUrl.startsWith('https://') && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      window.open(hijackerData!.liveUrl, '_blank', 'noopener,noreferrer');
+                    }}
+                    className="group w-full max-w-2xl flex items-center justify-between gap-4 px-6 py-4 rounded-xl
+                               bg-gradient-to-r from-emerald-500 to-emerald-600
+                               hover:from-emerald-600 hover:to-emerald-700
+                               text-white font-medium
+                               shadow-[0_4px_20px_rgba(34,197,94,0.3)]
+                               hover:shadow-[0_6px_28px_rgba(34,197,94,0.4)]
+                               transition-all duration-300 mb-4
+                               opacity-0 animate-fade-in-up"
+                    style={{ animationDelay: '300ms' }}
+                  >
+                    <div className="flex items-center gap-3 min-w-0">
+                      <span className="relative flex h-2.5 w-2.5 shrink-0">
+                        <span className="absolute inline-flex h-full w-full rounded-full bg-white opacity-75 animate-ping" />
+                        <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-white" />
+                      </span>
+                      <div className="min-w-0 text-left">
+                        <p className="text-[14px] font-body font-semibold leading-tight">
+                          View Report Online
+                        </p>
+                        <p className="text-[11px] text-emerald-100 truncate mt-0.5">
+                          Opens in a new tab so you can keep the site open
+                        </p>
+                      </div>
+                    </div>
+                    <svg
+                      width="20"
+                      height="20"
+                      viewBox="0 0 24 24"
+                      fill="none"
+                      stroke="currentColor"
+                      strokeWidth="2"
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      className="text-white shrink-0 group-hover:translate-x-1 transition-transform duration-200"
+                    >
+                      <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6" />
+                      <polyline points="15 3 21 3 21 9" />
+                      <line x1="10" y1="14" x2="21" y2="3" />
+                    </svg>
+                  </button>
+                )}
 
                 {/* See Why + Cost Breakdown buttons */}
                 <div
