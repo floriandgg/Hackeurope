@@ -47,3 +47,12 @@ class GraphState(TypedDict, total=False):
 
     # Agent 5 — invoice / ROI
     invoice: dict[str, Any]
+
+    # Agent 6 — Narrative Hijacker
+    hijacker_live_url: str
+    hijacker_html_generated: bool
+    hijacker_deployed: bool
+    hijacker_ads_simulated: bool
+    hijacker_ads_keywords: int
+    hijacker_ads_budget_eur: float
+    agent6_api_cost_eur: float

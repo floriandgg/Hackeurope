@@ -16,13 +16,14 @@ from __future__ import annotations
 import time
 import traceback
 from collections import Counter
+from concurrent.futures import ThreadPoolExecutor
 from typing import Any
 
 from google.genai import types as genai_types
 from langchain_google_genai import ChatGoogleGenerativeAI
 
 from src.graph.state import GraphState
-from src.clients.llm_client import llm_flash, llm_pro, GOOGLE_API_KEY
+from src.clients.llm_client import llm_flash, llm_pro, GOOGLE_API_KEY, GOOGLE_API_KEY1
 from src.shared.types import (
     Agent1Output, Agent2Output, HistoricalCrisis, ArticleDetail,
     SUBJECT_DISPLAY_NAMES,
@@ -122,7 +123,7 @@ def _severity_to_category(severity: int) -> str:
 # Step 2.2 — Three Grounded Gemini Searches
 # ---------------------------------------------------------------------------
 
-SEARCH_1_PROMPT = """\
+SEARCH_A_PROMPT = """\
 You are a corporate crisis research analyst with access to Google Search.
 
 CURRENT CRISIS:
@@ -133,70 +134,48 @@ CURRENT CRISIS:
 KEY ARTICLES FROM TODAY'S NEWS:
 {crisis_summary}
 
-YOUR TASK: Search for and identify 5-8 SIMILAR historical corporate crises that \
-happened at OTHER companies (NOT {company_name}).
+YOUR TASK: Search for 5-8 SIMILAR historical corporate crises at OTHER companies \
+(NOT {company_name}), AND the PR/communication strategy each company deployed.
 
-For each crisis you find, provide:
-- Company name
-- Year
+For each crisis, provide:
+- Company name and year
 - What happened (2-3 sentences)
-- How severe it was (financial losses, reputational damage)
+- The SPECIFIC response strategy (CEO apology, product recall, legal attack, silence, etc.)
+- Timeline of the response (how fast they reacted)
+- Any notable quotes or public statements
 
 SEARCH STRATEGY:
-- Read the articles above carefully — they describe the EXACT nature of the crisis
-- Search for crises matching the SAME specific issues (e.g. if it's food contamination, search for food contamination cases)
-- Also search for crises of similar SEVERITY regardless of industry
+- Search for crises matching the SAME specific issues described in the articles above
 - Look for well-documented cases from HBR, WSJ, Forbes, Reuters, Bloomberg
 - Include both famous cases AND lesser-known but highly relevant ones
+- Be SPECIFIC: "CEO X appeared on NBC within 24h" not just "issued an apology"
 
 Be thorough. Search multiple times with different keywords. Cite your sources."""
 
-SEARCH_2_PROMPT = """\
-You are a PR and crisis communication expert with access to Google Search.
-
-CONTEXT: We are analyzing how companies responded to crises similar to this one:
-- Company under threat: {company_name}
-- Crisis type: {primary_threat_category}
-- Crisis summary: {crisis_summary}
-
-HISTORICAL CRISES IDENTIFIED:
-{crises_found}
-
-YOUR TASK: For EACH historical crisis listed above, search for the EXACT PR and \
-communication strategy the company deployed in response.
-
-For each case, find:
-- The SPECIFIC actions taken (public apology, CEO statement, product recall, legal attack, silence, etc.)
-- The TIMELINE of the response (how quickly they reacted)
-- Who led the response (CEO, PR team, legal, board)
-- Any notable quotes or public statements
-- Whether they changed strategy mid-crisis
-
-Search for detailed post-mortems, case studies, and news coverage of each company's response.
-Be very specific — "issued a public apology" is too vague, we need "CEO X appeared on NBC within 24h and pledged $Y million to affected customers".
-Cite your sources."""
-
-SEARCH_3_PROMPT = """\
+SEARCH_B_PROMPT = """\
 You are a financial analyst specializing in crisis aftermath with access to Google Search.
 
-CONTEXT: We are analyzing the consequences of crisis responses for these historical cases:
-{crises_and_strategies}
+CURRENT CRISIS CONTEXT:
+- Company: {company_name}
+- Category: {primary_threat_category}
+- Severity: {severity_score}/5
+- Summary: {crisis_summary}
 
-YOUR TASK: For EACH case, search for the MEASURABLE OUTCOMES and long-term consequences \
-of the strategy adopted.
+YOUR TASK: Search for MEASURABLE OUTCOMES of historical corporate crises similar to \
+the one described above. Focus on companies that faced {primary_threat_category} issues.
 
-For each case, find:
+For each case you find, provide:
+- Company name and year of the crisis
 - Stock price impact (% drop, recovery timeline)
 - Revenue/sales impact (quarterly or annual figures)
 - Customer retention / churn data
 - Legal outcomes (fines, settlements, class actions)
-- Brand perception surveys or sentiment data
 - How long full recovery took (months/years)
 - Whether the company ultimately survived, thrived, or declined
 
 Search for financial reports, earnings calls, analyst notes, and retrospective articles.
 Prioritize QUANTITATIVE data over qualitative opinions.
-Cite your sources."""
+Be thorough. Cite your sources."""
 
 
 def _extract_grounding_sources(response) -> list[dict]:
@@ -221,15 +200,17 @@ def _extract_grounding_sources(response) -> list[dict]:
     return sources
 
 
-def _grounded_search(prompt: str, label: str) -> tuple[str, list[dict]]:
+def _grounded_search(prompt: str, label: str, api_key: str | None = None) -> tuple[str, list[dict]]:
     """Execute a single Gemini call with Google Search grounding.
-    Returns (text_content, list_of_sources)."""
-    if not GOOGLE_API_KEY:
+    Returns (text_content, list_of_sources).
+    Uses api_key if provided, otherwise falls back to GOOGLE_API_KEY."""
+    key = api_key or GOOGLE_API_KEY
+    if not key:
         raise RuntimeError("GOOGLE_API_KEY missing — cannot run grounded search.")
 
     llm_grounded = ChatGoogleGenerativeAI(
-        model="gemini-3-flash-preview",
-        google_api_key=GOOGLE_API_KEY,
+        model="gemini-2.5-flash",
+        google_api_key=key,
         temperature=0.1,
     )
 
@@ -248,9 +229,10 @@ def _grounded_search(prompt: str, label: str) -> tuple[str, list[dict]]:
 
 def _run_grounded_research(agent1: Agent1Output) -> tuple[dict[str, str], list[dict]]:
     """
-    Step 2.2: Run 3 sequential grounded searches.
-    Returns dict with keys: crises, strategies, outcomes.
+    Step 2.2: Two fully PARALLEL grounded searches on different API keys.
+    Search A (crises + strategies) on KEY 1, Search B (outcomes) on KEY 2.
     """
+    t0 = time.time()
     crisis_ctx = dict(
         company_name=agent1.company_name,
         primary_threat_category=agent1.primary_threat_category,
@@ -260,38 +242,30 @@ def _run_grounded_research(agent1: Agent1Output) -> tuple[dict[str, str], list[d
 
     all_sources: list[dict] = []
 
-    # Search 1: Find similar past crises
-    search1_text, search1_sources = _grounded_search(
-        SEARCH_1_PROMPT.format(**crisis_ctx),
-        "Search 1 — Similar Past Crises",
-    )
-    for s in search1_sources:
-        s["phase"] = "crises"
-    all_sources.extend(search1_sources)
+    with ThreadPoolExecutor(max_workers=2) as pool:
+        future_a = pool.submit(
+            _grounded_search,
+            SEARCH_A_PROMPT.format(**crisis_ctx),
+            "Search A — Crises & Strategies",
+            GOOGLE_API_KEY,
+        )
+        future_b = pool.submit(
+            _grounded_search,
+            SEARCH_B_PROMPT.format(**crisis_ctx),
+            "Search B — Outcomes & Financials",
+            GOOGLE_API_KEY1,
+        )
 
-    # Search 2: Find strategies used (feeds on Search 1 results)
-    search2_text, search2_sources = _grounded_search(
-        SEARCH_2_PROMPT.format(
-            **crisis_ctx,
-            crises_found=search1_text[:8000],
-        ),
-        "Search 2 — Response Strategies",
-    )
-    for s in search2_sources:
-        s["phase"] = "strategies"
-    all_sources.extend(search2_sources)
+        search_a_text, search_a_sources = future_a.result()
+        search_b_text, search_b_sources = future_b.result()
 
-    # Search 3: Find outcomes/consequences (feeds on Search 1 + 2 results)
-    combined = f"CRISES:\n{search1_text[:4000]}\n\nSTRATEGIES:\n{search2_text[:4000]}"
-    search3_text, search3_sources = _grounded_search(
-        SEARCH_3_PROMPT.format(crises_and_strategies=combined),
-        "Search 3 — Outcomes & Consequences",
-    )
-    for s in search3_sources:
+    for s in search_a_sources:
+        s["phase"] = "crises_strategies"
+    all_sources.extend(search_a_sources)
+    for s in search_b_sources:
         s["phase"] = "outcomes"
-    all_sources.extend(search3_sources)
+    all_sources.extend(search_b_sources)
 
-    # Deduplicate sources by URL
     seen: set[str] = set()
     unique_sources: list[dict] = []
     for s in all_sources:
@@ -299,12 +273,12 @@ def _run_grounded_research(agent1: Agent1Output) -> tuple[dict[str, str], list[d
             seen.add(s["url"])
             unique_sources.append(s)
 
-    print(f"[AGENT 2]   Total unique sources across 3 searches: {len(unique_sources)}")
+    print(f"[AGENT 2]   Total unique sources: {len(unique_sources)} | Research phase: {time.time() - t0:.1f}s")
 
     research = {
-        "crises": search1_text,
-        "strategies": search2_text,
-        "outcomes": search3_text,
+        "crises": search_a_text,
+        "strategies": search_a_text,
+        "outcomes": search_b_text,
     }
     return research, unique_sources
 
@@ -316,50 +290,40 @@ def _run_grounded_research(agent1: Agent1Output) -> tuple[dict[str, str], list[d
 EXTRACTOR_PROMPT = """\
 You are a senior financial and PR analyst at a top-tier consulting firm.
 
-Below is research gathered via Google Search about historical corporate crises, \
-the strategies companies used to respond, and the measurable outcomes.
+Below is research gathered via Google Search about historical corporate crises \
+(including the strategies used) and their measurable outcomes.
 
 CURRENT CRISIS CONTEXT:
 {crisis_summary}
 
---- RESEARCH: SIMILAR PAST CRISES ---
-{crises}
+--- RESEARCH: PAST CRISES & STRATEGIES ---
+{crises_and_strategies}
 
---- RESEARCH: RESPONSE STRATEGIES ---
-{strategies}
-
---- RESEARCH: OUTCOMES & CONSEQUENCES ---
+--- RESEARCH: OUTCOMES & FINANCIAL IMPACT ---
 {outcomes}
 --- END RESEARCH ---
 
-YOUR MISSION: Extract the 3 to 5 historical cases that are MOST analogous to \
-the current crisis above. Aim for diversity — different industries, strategies, and outcomes.
+Extract the 3 to 5 historical cases MOST analogous to the current crisis. \
+Aim for diversity — different industries, strategies, and outcomes.
 
-For each case you MUST provide:
-1. **company**: The real company name (must be mentioned in the research above)
-2. **year**: The year the crisis occurred (e.g. "2015")
-3. **crisis_summary**: One factual sentence about what happened
-4. **crisis_title**: Short title for the crisis (e.g. "Emissions Scandal", "Data Breach")
-5. **crisis_type**: Category — one of: "Product Safety", "Data & Privacy", "Regulatory & Governance", \
+For each case provide:
+1. **company**: Real company name from the research
+2. **year**: Year of the crisis
+3. **crisis_summary**: One factual sentence
+4. **crisis_title**: Short title (e.g. "Emissions Scandal")
+5. **crisis_type**: One of: "Product Safety", "Data & Privacy", "Regulatory & Governance", \
    "Reputation & Social", "Financial & Fraud", "Environmental", "Labor & Ethics"
-6. **strategy_adopted**: The EXACT communication/PR strategy deployed (be very specific: \
-   e.g. "CEO issued public apology within 24h and pledged $500M to victims" not just "apology")
-7. **outcome**: Measurable result with numbers when available \
-   (e.g. "Stock dropped 15% in 48h, recovered within 6 months" or "Lost 40% of customer base")
-8. **success_score**: 1-10 rating (1=catastrophic failure, 5=mixed, 10=textbook crisis management)
-9. **lesson**: One sentence describing the key lesson from this specific case
-10. **source_url**: The URL of the primary article or source you used for this case (must be from the research)
+6. **strategy_adopted**: SPECIFIC PR strategy deployed (e.g. "CEO X appeared on NBC within 24h and pledged $500M")
+7. **outcome**: Measurable result with numbers when available
+8. **success_score**: 1-10 rating
+9. **lesson**: One sentence key lesson
+10. **source_url**: URL from the research
 
 Also provide:
-- **global_lesson**: ONE strategic sentence synthesizing the key takeaway across all cases
-- **confidence**: 'high' if cases have verified financial data from the research, \
-  'medium' if partially sourced, 'low' if mostly estimated
+- **global_lesson**: ONE strategic sentence synthesizing the key takeaway
+- **confidence**: 'high' if verified financial data, 'medium' if partial, 'low' if estimated
 
-CRITICAL RULES:
-- Only extract cases that actually appear in the research — do NOT invent cases
-- Cross-reference data between the three research sections for accuracy
-- If a case lacks financial data, say so explicitly in the outcome field
-- Prefer cases where all three dimensions (crisis, strategy, outcome) are well-documented"""
+RULES: Only extract cases from the research. Do NOT invent. Be specific."""
 
 VERIFICATION_PROMPT = """\
 You are a fact-checker. Below is a list of historical crisis cases extracted by an AI analyst, \
@@ -435,57 +399,12 @@ def _extract_and_verify(
     structured = llm_pro.with_structured_output(Agent2Output)
     prompt = EXTRACTOR_PROMPT.format(
         crisis_summary=crisis_summary,
-        crises=research["crises"][:15000],
-        strategies=research["strategies"][:15000],
-        outcomes=research["outcomes"][:15000],
+        crises_and_strategies=research["crises"][:10000],
+        outcomes=research["outcomes"][:10000],
     )
 
     output: Agent2Output = _retry_llm(lambda: structured.invoke(prompt))
-    print(f"[AGENT 2]   Extraction (Pro): {time.time() - t_extract:.1f}s")
-
-    t_verify = time.time()
-    if output.past_cases and llm_flash:
-        cases_text = "\n".join(
-            f"Case {i+1}: {c.company} -- {c.crisis_summary} | Strategy: {c.strategy_adopted[:100]} | Outcome: {c.outcome}"
-            for i, c in enumerate(output.past_cases)
-        )
-        all_research = "\n\n".join(
-            f"--- {k.upper()} ---\n{v[:8000]}" for k, v in research.items()
-        )
-        verify_prompt = VERIFICATION_PROMPT.format(
-            cases=cases_text,
-            research=all_research,
-        )
-        try:
-            verify_result = llm_flash.invoke(verify_prompt)
-            verify_text = verify_result.content.strip().upper()
-            print(f"[AGENT 2]   Verification: {verify_text[:200]}")
-
-            if "FABRICATED" in verify_text:
-                verified_cases = []
-                for i, case in enumerate(output.past_cases):
-                    marker = f"CASE {i+1}"
-                    if marker in verify_text and "FABRICATED" in verify_text.split(marker)[-1].split("CASE")[0]:
-                        print(f"[AGENT 2]   REMOVED fabricated case: {case.company}")
-                    else:
-                        verified_cases.append(case)
-
-                if verified_cases:
-                    output = Agent2Output(
-                        past_cases=verified_cases,
-                        global_lesson=output.global_lesson,
-                        confidence=output.confidence if len(verified_cases) == len(output.past_cases) else "medium",
-                    )
-                else:
-                    print("[AGENT 2]   WARNING: All cases flagged, keeping originals with low confidence")
-                    output = Agent2Output(
-                        past_cases=output.past_cases,
-                        global_lesson=output.global_lesson,
-                        confidence="low",
-                    )
-        except Exception as e:
-            print(f"[AGENT 2]   Verification failed (non-blocking): {e}")
-    print(f"[AGENT 2]   Verification (Flash): {time.time() - t_verify:.1f}s")
+    print(f"[AGENT 2]   Extraction: {time.time() - t_extract:.1f}s, {len(output.past_cases)} cases")
 
     # Phase C: Match sources to cases
     if sources:
@@ -556,7 +475,7 @@ def _run_pipeline(
     # --- Step 2.2: Grounded Research (3 Google Search calls) ---
     print("\n[AGENT 2] === Step 2.2: Grounded Research (3 searches) ===")
     research, sources = _run_grounded_research(agent1_output)
-    api_cost += 0.035 * 3  # ~$35/1000 queries
+    api_cost += 0.035 * 2
 
     if all(len(v) < 100 for v in research.values()):
         print("[AGENT 2] WARNING: All searches returned minimal results.")
@@ -578,8 +497,7 @@ def _run_pipeline(
     # --- Step 2.3: Extract & Verify ---
     print("\n[AGENT 2] === Step 2.3: Extract & Verify ===")
     output: Agent2Output = _extract_and_verify(research, agent1_output.crisis_summary, sources)
-    api_cost += 0.015  # Pro extraction
-    api_cost += 0.002  # Flash verification
+    api_cost += 0.005  # Flash extraction
 
     # --- Source-quality-driven confidence ---
     total_chars = sum(len(v) for v in research.values())
@@ -728,8 +646,7 @@ def precedents_node_from_topic(
             print(f"[AGENT 2]   -> {case.company} (score: {case.success_score}/10)")
         print(f"[AGENT 2]   Lesson: {output.global_lesson}")
 
-        # API cost: 3 grounded searches + Pro extraction + Flash verification
-        api_cost = (0.035 * 3) + 0.015 + 0.002
+        api_cost = (0.035 * 2) + 0.005
 
         return {
             "precedents": past_cases_dicts,
