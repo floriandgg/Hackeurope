@@ -15,7 +15,7 @@ import traceback
 from typing import Any
 
 from src.graph.state import GraphState
-from src.clients.llm_client import llm_pro, llm_flash
+from src.clients.llm_client import llm_pro_alt as llm_pro, llm_flash_alt as llm_flash
 from src.shared.types import Agent4Output
 from src.utils.paid_helpers import emit_agent4_signal
 

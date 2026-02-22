@@ -5,11 +5,12 @@ Run:
     cd backend && PYTHONPATH=. uvicorn src.server:app --reload --port 8000
 """
 import sys
+import time
+from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 
 from dotenv import load_dotenv
 
-# Load .env early
 _env_cwd = Path.cwd() / ".env"
 _env_backend = Path(__file__).resolve().parents[1] / ".env"
 _env_root = Path(__file__).resolve().parents[2] / ".env"
@@ -93,25 +94,36 @@ class CrisisResponseRequest(BaseModel):
 
 @app.post("/api/crisis-response")
 def crisis_response(req: CrisisResponseRequest):
-    """Run Agent 3 + Agent 2 + Agent 4 and return the full crisis response."""
-    # Step 1: Agent 3 — enrich articles with financial risk metrics
-    scorer_result = scorer_from_articles(req.articles)
+    """Run Agent 2 + Agent 3 in PARALLEL (different API keys), then Agent 4, then Agent 5."""
+    t0 = time.time()
+
+    # --- PARALLEL: Agent 2 (GOOGLE_API_KEY) + Agent 3 (GOOGLE_API_KEY1) ---
+    with ThreadPoolExecutor(max_workers=2) as pool:
+        future_agent2 = pool.submit(
+            precedents_node_from_topic,
+            company_name=req.company_name,
+            topic_name=req.topic_name,
+            topic_summary=req.topic_summary,
+            articles=req.articles,
+        )
+        future_agent3 = pool.submit(scorer_from_articles, req.articles)
+
+        precedents_result = future_agent2.result()
+        scorer_result = future_agent3.result()
+
+    parallel_elapsed = time.time() - t0
+    print(f"[SERVER] Agent 2 + Agent 3 parallel block done in {parallel_elapsed:.1f}s")
+
     enriched_articles = scorer_result.get("articles", [])
     total_var_impact = scorer_result.get("total_var_impact", 0.0)
     severity_score = scorer_result.get("severity_score", 0)
 
-    # Step 2: Agent 2 — find historical precedents
-    precedents_result = precedents_node_from_topic(
-        company_name=req.company_name,
-        topic_name=req.topic_name,
-        topic_summary=req.topic_summary,
-        articles=req.articles,
-    )
     prec = precedents_result.get("precedents", [])
     global_lesson = precedents_result.get("global_lesson", "")
     confidence = precedents_result.get("confidence", "low")
 
-    # Step 3: Agent 4 — generate strategies + drafts
+    # --- SEQUENTIAL: Agent 4 (needs results from both Agent 2 + 3) ---
+    t1 = time.time()
     strategist_result = strategist_from_data(
         company_name=req.company_name,
         articles=enriched_articles,
@@ -121,8 +133,9 @@ def crisis_response(req: CrisisResponseRequest):
         total_var_impact=total_var_impact,
         severity_score=severity_score,
     )
+    print(f"[SERVER] Agent 4 done in {time.time() - t1:.1f}s")
 
-    # Step 4: Agent 5 — build invoice with ROI analysis
+    # --- SEQUENTIAL: Agent 5 (needs Agent 4 result) ---
     strategy_report = strategist_result.get("strategy_report", {})
     alert_level = strategy_report.get("alert_level", "MEDIUM")
     agent4_api_cost = strategist_result.get("agent4_api_cost_eur", 0.02)
@@ -135,6 +148,9 @@ def crisis_response(req: CrisisResponseRequest):
         total_var_impact=total_var_impact,
         alert_level=alert_level,
     )
+
+    total_elapsed = time.time() - t0
+    print(f"[SERVER] Full pipeline done in {total_elapsed:.1f}s")
 
     return {
         "strategy_report": strategy_report,

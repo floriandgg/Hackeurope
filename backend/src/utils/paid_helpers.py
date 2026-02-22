@@ -10,9 +10,12 @@ import os
 import uuid
 from pathlib import Path
 try:
-    from paid import Paid
+    from paid import Paid, Signal, CustomerByExternalId, ProductByExternalId
 except ImportError:
     Paid = None  # type: ignore[assignment,misc]
+    Signal = None  # type: ignore[assignment,misc]
+    CustomerByExternalId = None  # type: ignore[assignment,misc]
+    ProductByExternalId = None  # type: ignore[assignment,misc]
 from dotenv import load_dotenv
 
 # Load .env (cwd, backend/, project root)
@@ -35,7 +38,23 @@ AUDIT_RISK_PERCENT = 0.0001  # 0.01% of financial risk
 CRISIS_STRATEGY_FEE_EUR = 2500.00
 
 
-def _send_signal(signal: dict, agent_name: str) -> bool:
+def _build_signal(
+    event_name: str,
+    customer_external_id: str,
+    idempotency_key: str,
+    data: dict,
+) -> "Signal":
+    """Build a typed Signal object for the Paid API."""
+    return Signal(
+        event_name=event_name,
+        customer=CustomerByExternalId(external_customer_id=customer_external_id),
+        attribution=ProductByExternalId(external_product_id=EXTERNAL_PRODUCT_ID),
+        idempotency_key=idempotency_key,
+        data=data,
+    )
+
+
+def _send_signal(signal, agent_name: str) -> bool:
     """Sends a signal to Paid.ai. Returns True on success."""
     if not paid_client:
         print(f"[PAID.AI] Client not configured (PAID_API_KEY missing). Signal ignored: {agent_name}")
@@ -69,12 +88,11 @@ def emit_agent2_signal(
         else 0.0
     )
 
-    signal = {
-        "event_name": "historical_precedents_extracted",
-        "customer": {"external_customer_id": customer_external_id},
-        "attribution": {"external_product_id": EXTERNAL_PRODUCT_ID},
-        "idempotency_key": f"agent2_{crisis_id}_{uuid.uuid4().hex[:6]}",
-        "data": {
+    signal = _build_signal(
+        event_name="historical_precedents_extracted",
+        customer_external_id=customer_external_id,
+        idempotency_key=f"agent2_{crisis_id}_{uuid.uuid4().hex[:6]}",
+        data={
             "cases_found": cases_count,
             "estimated_hours_saved": hours_saved,
             "human_equivalent_value_eur": consulting_value,
@@ -82,7 +100,7 @@ def emit_agent2_signal(
             "agent_gross_margin_percent": round(gross_margin_percent, 2),
             "key_lesson": (global_lesson or "")[:100],
         },
-    }
+    )
 
     if _send_signal(signal, "AGENT 2"):
         print(
@@ -112,12 +130,11 @@ def emit_agent3_signal(
         else 0.0
     )
 
-    signal = {
-        "event_name": "risk_assessment_completed",
-        "customer": {"external_customer_id": customer_external_id},
-        "attribution": {"external_product_id": EXTERNAL_PRODUCT_ID},
-        "idempotency_key": f"agent3_{crisis_id}_{uuid.uuid4().hex[:6]}",
-        "data": {
+    signal = _build_signal(
+        event_name="risk_assessment_completed",
+        customer_external_id=customer_external_id,
+        idempotency_key=f"agent3_{crisis_id}_{uuid.uuid4().hex[:6]}",
+        data={
             "severity_score_1_to_5": severity_score,
             "estimated_financial_exposure": estimated_financial_loss,
             "audit_fee_eur": audit_fee_eur,
@@ -126,7 +143,7 @@ def emit_agent3_signal(
             "api_compute_cost_eur": api_compute_cost_eur,
             "agent_gross_margin_percent": round(gross_margin_percent, 2),
         },
-    }
+    )
 
     if _send_signal(signal, "AGENT 3"):
         print(
@@ -155,12 +172,11 @@ def emit_agent4_signal(
         else 0.0
     )
 
-    signal = {
-        "event_name": "crisis_strategy_delivered",
-        "customer": {"external_customer_id": customer_external_id},
-        "attribution": {"external_product_id": EXTERNAL_PRODUCT_ID},
-        "idempotency_key": f"agent4_{crisis_id}_{uuid.uuid4().hex[:6]}",
-        "data": {
+    signal = _build_signal(
+        event_name="crisis_strategy_delivered",
+        customer_external_id=customer_external_id,
+        idempotency_key=f"agent4_{crisis_id}_{uuid.uuid4().hex[:6]}",
+        data={
             "recommended_strategy": recommended_strategy_name,
             "assets_drafted": drafts_generated,
             "strategy_fee_eur": crisis_management_fee,
@@ -169,7 +185,7 @@ def emit_agent4_signal(
             "api_compute_cost_eur": api_compute_cost_eur,
             "agent_gross_margin_percent": round(gross_margin_percent, 2),
         },
-    }
+    )
 
     if _send_signal(signal, "AGENT 4"):
         print(

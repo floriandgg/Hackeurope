@@ -5,7 +5,9 @@ Collects articles via Tavily, scores Authority/Severity via Gemini,
 computes Recency Multiplier and Exposure Score.
 Sets customer_id and crisis_id for Paid.ai (Agents 2, 3, 4).
 """
+import time
 import uuid
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from datetime import datetime
 from dateutil import parser as date_parser
 
@@ -180,105 +182,115 @@ Respond with is_substantive_article, summary, subject, author, authority_score, 
         return None
 
 
+def _process_single_article(r: dict, company_name: str = "") -> dict | None:
+    """Process one Tavily result: fetch content, analyze with Gemini, score.
+    Returns article dict or None if skipped."""
+    title = r.get("title", "")
+    url = r.get("url", "")
+    pub_date = r.get("pub_date")
+
+    content_from_jina = get_markdown_content(url)
+    if content_from_jina and len(content_from_jina.strip()) > 100:
+        content = content_from_jina
+    else:
+        content = r.get("content", "") or ""
+        content = _filter_content_to_article(title, content)
+
+    if _is_likely_paywalled(content):
+        print(f"[AGENT 1] Skipped (paywall): {title[:60]}...")
+        return None
+
+    _title_lower = title.lower()
+    if any(x in _title_lower for x in ("sign up for", "newsletter", "get our newsletter", "subscribe to our")):
+        print(f"[AGENT 1] Skipped (newsletter/promo): {title[:60]}...")
+        return None
+
+    scores = _analyze_article_with_gemini(title, content, url, company_name)
+    if scores is None:
+        summary = (content or "")[:300] if content else title
+        subject = "ethics_management"
+        author = ""
+        authority_score = 3
+        severity_score = 2
+        sentiment = "neutral"
+    elif not getattr(scores, "is_substantive_article", True):
+        print(f"[AGENT 1] Skipped (not substantive): {title[:60]}...")
+        return None
+    else:
+        summary = (scores.summary or content or title)[:300]
+        subject = scores.subject if scores.subject in SUBJECT_KEYS else "ethics_management"
+        author = (scores.author or "").strip()[:200]
+        authority_score = scores.authority_score
+        severity_score = scores.severity_score
+        sentiment = getattr(scores, "sentiment", "neutral") or "neutral"
+        sentiment = sentiment.lower().strip()
+        if sentiment not in SENTIMENT_WEIGHTS:
+            sentiment = "neutral"
+
+    recency_mult = _recency_multiplier(pub_date)
+    risk_mult = _get_risk_multiplier(subject)
+    sentiment_weight = SENTIMENT_WEIGHTS.get(sentiment, 0.5)
+    exposure_score = (
+        (authority_score * severity_score)
+        * risk_mult
+        * recency_mult
+        * sentiment_weight
+    )
+
+    return {
+        "title": title,
+        "summary": summary,
+        "url": url,
+        "content": content,
+        "pub_date": pub_date,
+        "author": author,
+        "subject": subject,
+        "sentiment": sentiment,
+        "authority_score": authority_score,
+        "severity_score": severity_score,
+        "recency_multiplier": recency_mult,
+        "exposure_score": round(exposure_score, 2),
+    }
+
+
 def watcher_node(state: GraphState) -> dict:
     """
     Agent 1: collects articles (Tavily), LLM analysis (Gemini), Exposure scoring.
-    Formula: Exposure Score = (Authority × Severity) × Recency Multiplier
+    Formula: Exposure Score = (Authority x Severity) x Recency Multiplier
     """
+    t0 = time.time()
     company_name = state.get("company_name", "")
     customer_id = state.get("customer_id") or _derive_customer_id(company_name)
     crisis_id = str(uuid.uuid4())
 
     # --- Step A: Tavily search ---
+    t_search = time.time()
     raw_results = search_news(company_name, max_results=10)
+    print(f"[AGENT 1] Tavily search: {time.time() - t_search:.1f}s ({len(raw_results or [])} results)")
     if not raw_results:
         print("[AGENT 1] No articles found by Tavily.")
         return {
             "customer_id": customer_id,
             "crisis_id": crisis_id,
             "articles": [],
-        "subjects": [],
+            "subjects": [],
         }
 
-    # --- Étapes B, C, D : Analyse et scoring pour chaque article ---
+    # --- Steps B, C, D: Parallel processing of all articles ---
+    t_process = time.time()
     articles = []
-    for r in raw_results:
-        title = r.get("title", "")
-        url = r.get("url", "")
-        pub_date = r.get("pub_date")
-
-        # Content: Jina Reader first (clean Markdown), fallback to Tavily + paragraph filter
-        content_from_jina = get_markdown_content(url)
-        if content_from_jina and len(content_from_jina.strip()) > 100:
-            content = content_from_jina
-        else:
-            content = r.get("content", "") or ""
-            content = _filter_content_to_article(title, content)
-
-        # Skip paywalled articles — don't recommend based on teaser only
-        if _is_likely_paywalled(content):
-            print(f"[AGENT 1] Skipped (paywall): {title[:60]}...")
-            continue
-
-        # Skip obvious newsletter/promo pages before calling Gemini
-        _title_lower = title.lower()
-        if any(x in _title_lower for x in ("sign up for", "newsletter", "get our newsletter", "subscribe to our")):
-            print(f"[AGENT 1] Skipped (newsletter/promo): {title[:60]}...")
-            continue
-
-        # B: Gemini (is_substantive + summary + subject + author + Authority + Severity)
-        scores = _analyze_article_with_gemini(title, content, url, company_name)
-        if scores is None:
-            summary = (content or "")[:300] if content else title  # fallback
-            subject = "ethics_management"
-            author = ""
-            authority_score = 3
-            severity_score = 2
-            sentiment = "neutral"
-        elif not getattr(scores, "is_substantive_article", True):
-            print(f"[AGENT 1] Skipped (not substantive): {title[:60]}...")
-            continue
-        else:
-            summary = (scores.summary or content or title)[:300]
-            subject = scores.subject if scores.subject in SUBJECT_KEYS else "ethics_management"
-            author = (scores.author or "").strip()[:200]
-            authority_score = scores.authority_score
-            severity_score = scores.severity_score
-            sentiment = getattr(scores, "sentiment", "neutral") or "neutral"
-            sentiment = sentiment.lower().strip()
-            if sentiment not in SENTIMENT_WEIGHTS:
-                sentiment = "neutral"
-
-        # C: Recency Multiplier (days-based)
-        recency_mult = _recency_multiplier(pub_date)
-
-        # D: Exposure Score formula
-        # base × risk_mult × recency × sentiment_weight (asymmetric: negative full, positive 0.1)
-        risk_mult = _get_risk_multiplier(subject)
-        sentiment_weight = SENTIMENT_WEIGHTS.get(sentiment, 0.5)
-        exposure_score = (
-            (authority_score * severity_score)
-            * risk_mult
-            * recency_mult
-            * sentiment_weight
-        )
-
-        article = {
-            "title": title,
-            "summary": summary,
-            "url": url,
-            "content": content,
-            "pub_date": pub_date,
-            "author": author,
-            "subject": subject,
-            "sentiment": sentiment,
-            "authority_score": authority_score,
-            "severity_score": severity_score,
-            "recency_multiplier": recency_mult,
-            "exposure_score": round(exposure_score, 2),
-        }
-        articles.append(article)
-        print(f"[AGENT 1] Article found: {title} | Score: {article['exposure_score']}")
+    with ThreadPoolExecutor(max_workers=5) as pool:
+        futures = {pool.submit(_process_single_article, r, company_name): r for r in raw_results}
+        for future in as_completed(futures):
+            try:
+                result = future.result()
+                if result is not None:
+                    articles.append(result)
+                    print(f"[AGENT 1] Article found: {result['title'][:60]} | Score: {result['exposure_score']}")
+            except Exception as e:
+                title = futures[future].get("title", "?")
+                print(f"[AGENT 1] Error processing '{title[:50]}': {e}")
+    print(f"[AGENT 1] Parallel article processing: {time.time() - t_process:.1f}s ({len(articles)} kept)")
 
     # Sort by Exposure Score descending
     articles.sort(key=lambda a: a["exposure_score"], reverse=True)
@@ -309,11 +321,12 @@ def watcher_node(state: GraphState) -> dict:
         reverse=True,
     )
 
+    print(f"[AGENT 1] Total time: {time.time() - t0:.1f}s")
     return {
         "customer_id": customer_id,
         "crisis_id": crisis_id,
-        "articles": articles,  # Flat list for Agent 2, 3
-        "subjects": subjects,  # Grouped for frontend
+        "articles": articles,
+        "subjects": subjects,
     }
 
 

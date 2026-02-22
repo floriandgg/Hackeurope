@@ -228,7 +228,7 @@ def _grounded_search(prompt: str, label: str) -> tuple[str, list[dict]]:
         raise RuntimeError("GOOGLE_API_KEY missing — cannot run grounded search.")
 
     llm_grounded = ChatGoogleGenerativeAI(
-        model="gemini-2.5-pro",
+        model="gemini-3-flash-preview",
         google_api_key=GOOGLE_API_KEY,
         temperature=0.1,
     )
@@ -236,11 +236,13 @@ def _grounded_search(prompt: str, label: str) -> tuple[str, list[dict]]:
     def call():
         return llm_grounded.invoke(prompt, tools=[GOOGLE_SEARCH_TOOL])
 
+    t0 = time.time()
     print(f"[AGENT 2]   Running grounded search: {label}...")
     result = _retry_llm(call)
     text = result.content
     sources = _extract_grounding_sources(result)
-    print(f"[AGENT 2]   {label} returned {len(text)} chars, {len(sources)} sources")
+    elapsed = time.time() - t0
+    print(f"[AGENT 2]   {label}: {len(text)} chars, {len(sources)} sources in {elapsed:.1f}s")
     return text, sources
 
 
@@ -429,7 +431,7 @@ def _extract_and_verify(
     total_research_len = sum(len(v) for v in research.values())
     print(f"[AGENT 2]   Total research context: {total_research_len} chars")
 
-    # Phase A: Structured extraction via Gemini Pro
+    t_extract = time.time()
     structured = llm_pro.with_structured_output(Agent2Output)
     prompt = EXTRACTOR_PROMPT.format(
         crisis_summary=crisis_summary,
@@ -439,8 +441,9 @@ def _extract_and_verify(
     )
 
     output: Agent2Output = _retry_llm(lambda: structured.invoke(prompt))
+    print(f"[AGENT 2]   Extraction (Pro): {time.time() - t_extract:.1f}s")
 
-    # Phase B: Verification pass via Gemini Flash
+    t_verify = time.time()
     if output.past_cases and llm_flash:
         cases_text = "\n".join(
             f"Case {i+1}: {c.company} -- {c.crisis_summary} | Strategy: {c.strategy_adopted[:100]} | Outcome: {c.outcome}"
@@ -482,6 +485,7 @@ def _extract_and_verify(
                     )
         except Exception as e:
             print(f"[AGENT 2]   Verification failed (non-blocking): {e}")
+    print(f"[AGENT 2]   Verification (Flash): {time.time() - t_verify:.1f}s")
 
     # Phase C: Match sources to cases
     if sources:

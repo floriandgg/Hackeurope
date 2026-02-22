@@ -23,14 +23,11 @@ import {
 
 import openaiSearch from './raw/openai-search.json';
 import teslaSearch from './raw/tesla-search.json';
-import appleSearch from './raw/apple-search.json';
 
 // OpenAI crisis responses (one per topic — we import as many as exist)
 const openaiCrisisModules = import.meta.glob('./raw/openai-topic-*-crisis.json', { eager: true });
 // Tesla crisis responses
 const teslaCrisisModules = import.meta.glob('./raw/tesla-topic-*-crisis.json', { eager: true });
-// Apple crisis responses
-const appleCrisisModules = import.meta.glob('./raw/apple-topic-*-crisis.json', { eager: true });
 
 /* ─── Types ─── */
 
@@ -93,5 +90,4 @@ function buildCompanyData(
 export const DEMO_DATA: Record<string, DemoCompanyData> = {
   openai: buildCompanyData('OpenAI', openaiSearch as SearchResponse, openaiCrisisModules),
   tesla: buildCompanyData('Tesla', teslaSearch as SearchResponse, teslaCrisisModules),
-  apple: buildCompanyData('Apple', appleSearch as SearchResponse, appleCrisisModules),
 };

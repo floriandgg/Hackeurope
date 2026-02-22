@@ -8,8 +8,11 @@ Uses dampened formulas to avoid overestimation:
 - Churn: correlated to Authority (exposure) and Severity
 - Deduplication: multi-article VaR uses decreasing weights (1.0, 0.2, 0.1, ...)
 """
+import time
+from concurrent.futures import ThreadPoolExecutor, as_completed
+
 from src.graph.state import GraphState
-from src.clients.llm_client import llm
+from src.clients.llm_client import llm_flash_alt as llm
 from src.shared.types import ArticleTopicAndViral
 from src.utils.paid_helpers import emit_agent3_signal
 
@@ -127,11 +130,49 @@ def _compute_value_at_risk(
     return acquisition_loss + churn_loss
 
 
+def _enrich_single_article(art: dict) -> dict | None:
+    """Enrich a single article with risk metrics. Thread-safe."""
+    title = art.get("title", "")
+    content = art.get("content", "")
+    authority_score = int(art.get("authority_score", 3))
+    severity_score = int(art.get("severity_score", 2))
+
+    topic_viral = _analyze_topic_and_viral(title, content)
+    if topic_viral:
+        topic_weight = _get_topic_weight(topic_viral.topic)
+        viral_coefficient = float(topic_viral.viral_coefficient)
+    else:
+        topic_weight = 1.0
+        viral_coefficient = 1.2
+
+    reach = _compute_reach(authority_score, severity_score, viral_coefficient)
+    exposed_clients = _compute_exposed_clients(authority_score)
+    value_at_risk = _compute_value_at_risk(
+        reach, authority_score, severity_score, topic_weight
+    )
+
+    reach = round(reach, 2)
+    churn_risk_percent = round((exposed_clients / TOTAL_CLIENTS) * 100, 2)
+    value_at_risk = round(value_at_risk, 2)
+
+    print(
+        f"[AGENT 3] Risk analysis: {title[:50]}... | "
+        f"Reach: {reach:,.0f} | VaR: {value_at_risk:,.2f}EUR"
+    )
+    return {
+        **art,
+        "reach_estimate": reach,
+        "churn_risk_percent": churn_risk_percent,
+        "value_at_risk": value_at_risk,
+    }
+
+
 def scorer_node(state: GraphState) -> dict:
     """
     Agent 3: analyzes each article, computes Reach, Churn Risk, VaR.
     Enriches articles and computes total_var_impact.
     """
+    t0 = time.time()
     customer_id = state.get("customer_id", "")
     crisis_id = state.get("crisis_id", "")
     articles = list(state.get("articles", []))
@@ -145,50 +186,22 @@ def scorer_node(state: GraphState) -> dict:
             "articles": [],
         }
 
-    total_var_impact = 0.0
-    max_severity = 0
     enriched_articles = []
+    max_severity = 0
 
-    for art in articles:
-        title = art.get("title", "")
-        content = art.get("content", "")
-        authority_score = int(art.get("authority_score", 3))
-        severity_score = int(art.get("severity_score", 2))
+    with ThreadPoolExecutor(max_workers=5) as pool:
+        futures = {pool.submit(_enrich_single_article, art): art for art in articles}
+        for future in as_completed(futures):
+            try:
+                result = future.result()
+                if result:
+                    enriched_articles.append(result)
+                    max_severity = max(max_severity, int(result.get("severity_score", 0)))
+            except Exception as e:
+                title = futures[future].get("title", "?")
+                print(f"[AGENT 3] Error enriching '{title[:50]}': {e}")
 
-        # Topic + viral classification via Gemini
-        topic_viral = _analyze_topic_and_viral(title, content)
-        if topic_viral:
-            topic_weight = _get_topic_weight(topic_viral.topic)
-            viral_coefficient = float(topic_viral.viral_coefficient)
-        else:
-            topic_weight = 1.0
-            viral_coefficient = 1.2
-
-        # Calculation formulas (dampened)
-        reach = _compute_reach(authority_score, severity_score, viral_coefficient)
-        exposed_clients = _compute_exposed_clients(authority_score)
-        value_at_risk = _compute_value_at_risk(
-            reach, authority_score, severity_score, topic_weight
-        )
-
-        # Round to 2 decimals
-        reach = round(reach, 2)
-        churn_risk_percent = round((exposed_clients / TOTAL_CLIENTS) * 100, 2)  # exposure %
-        value_at_risk = round(value_at_risk, 2)
-
-        art_enriched = {
-            **art,
-            "reach_estimate": reach,
-            "churn_risk_percent": churn_risk_percent,
-            "value_at_risk": value_at_risk,
-        }
-        enriched_articles.append(art_enriched)
-        max_severity = max(max_severity, severity_score)
-
-        print(
-            f"[AGENT 3] Risk analysis: {title[:50]}... | "
-            f"Reach: {reach:,.0f} | VaR: {value_at_risk:,.2f}€"
-        )
+    print(f"[AGENT 3] Parallel enrichment: {time.time() - t0:.1f}s ({len(enriched_articles)} articles)")
 
     # Deduplication: sort by VaR desc, apply decreasing weights (1.0, 0.2, 0.1, ...)
     sorted_by_var = sorted(enriched_articles, key=lambda a: a["value_at_risk"], reverse=True)
@@ -210,9 +223,9 @@ def scorer_node(state: GraphState) -> dict:
             api_compute_cost_eur=api_compute_cost_eur,
         )
 
-    # Estimate API cost: ~0.08 EUR per Gemini call per article
     api_cost = len(enriched_articles) * 0.008 if enriched_articles else 0.0
 
+    print(f"[AGENT 3] Total time: {time.time() - t0:.1f}s | VaR: {total_var_impact:,.2f}EUR")
     return {
         "articles": enriched_articles,
         "total_var_impact": total_var_impact,
