@@ -25,7 +25,7 @@ def search_news(company_name: str, max_results: int = 10) -> list[dict]:
         print("[AGENT 1] Tavily client not configured (TAVILY_API_KEY missing).")
         return []
 
-    query = f"latest scandal or critical news about {company_name}"
+    query = f'latest scandal or critical news about "{company_name}"'
     response = tavily_client.search(
         query=query,
         search_depth="advanced",
