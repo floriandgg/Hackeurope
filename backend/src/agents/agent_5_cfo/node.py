@@ -19,6 +19,7 @@ from src.utils.paid_helpers import (
     BASE_AUDIT_FEE_EUR,
     AUDIT_RISK_PERCENT,
     CRISIS_STRATEGY_FEE_EUR,
+    get_tier,
 )
 
 
@@ -30,111 +31,112 @@ def _build_invoice(
     total_var_impact: float,
     alert_level: str,
 ) -> Agent5Output:
-    """Build the full invoice from agent costs and outcome data."""
+    """Build the full invoice using tier-based pricing."""
 
-    # --- Action refusal check ---
+    tier = get_tier(alert_level)
+    tier_name = tier["name"]
+    tier_label = tier["label"]
+    tier_price = tier["price"]
+    total_api = round(agent2_api_cost + agent3_api_cost + agent4_api_cost, 4)
+
     if alert_level == "IGNORE":
         return Agent5Output(
+            tier_name=tier_name,
+            tier_label=tier_label,
+            tier_price_eur=tier_price,
             line_items=[],
-            total_human_equivalent_eur=0.0,
-            total_api_cost_eur=round(agent2_api_cost + agent3_api_cost + agent4_api_cost, 4),
+            total_human_equivalent_eur=tier_price,
+            total_api_cost_eur=total_api,
             total_gross_margin_percent=0.0,
             roi_multiplier=0.0,
-            invoice_summary="No billable action — crisis assessed as IGNORE level.",
+            invoice_summary=f"Threat dismissed — {tier_label} tier (€{tier_price:.0f}).",
             trade_off_reasoning=(
                 "The AI agents determined this situation does not warrant a crisis response. "
-                "A traditional PR agency would have charged a minimum retainer fee "
-                f"(typically €{CRISIS_STRATEGY_FEE_EUR:,.0f}+) just for the initial assessment. "
-                "Our AI completed the analysis at minimal compute cost."
+                f"A traditional PR agency would have charged €{CRISIS_STRATEGY_FEE_EUR:,.0f}+ "
+                f"just for the initial assessment. Our AI completed the full analysis for €{tier_price:.0f}."
             ),
             action_refused=True,
             refusal_reason=(
-                "Alert level is IGNORE — the crisis is too minor to warrant billable "
-                "deliverables. Only monitoring costs were incurred."
+                "Alert level is IGNORE — the crisis is too minor to warrant active defense. "
+                "Monitoring and analysis delivered at the Dismissed tier rate."
             ),
         )
 
-    # --- Agent 2: Historical Strategist ---
+    # --- Per-agent breakdown (consulting comparison, NOT the billed price) ---
     hours_saved = cases_count * 3
-    agent2_value = hours_saved * CONSULTING_HOUR_RATE_EUR
-    agent2_margin = (
-        ((agent2_value - agent2_api_cost) / agent2_value) * 100
-        if agent2_value > 0
-        else 0.0
-    )
+    agent2_consulting = hours_saved * CONSULTING_HOUR_RATE_EUR
+    agent3_consulting = round(BASE_AUDIT_FEE_EUR + (total_var_impact * AUDIT_RISK_PERCENT), 2)
+    agent4_consulting = CRISIS_STRATEGY_FEE_EUR
+    total_consulting = agent2_consulting + agent3_consulting + agent4_consulting
+
     line_agent2 = InvoiceLineItem(
         agent="Historical Strategist",
         event="historical_precedents_extracted",
-        human_equivalent_value_eur=round(agent2_value, 2),
+        human_equivalent_value_eur=round(agent2_consulting, 2),
         api_compute_cost_eur=round(agent2_api_cost, 4),
-        gross_margin_percent=round(agent2_margin, 2),
-        detail=f"{cases_count} cases × 3h × €{CONSULTING_HOUR_RATE_EUR}/h",
+        gross_margin_percent=round(
+            ((agent2_consulting - agent2_api_cost) / agent2_consulting) * 100
+            if agent2_consulting > 0 else 0.0, 2
+        ),
+        detail=f"{cases_count} cases x 3h x EUR{CONSULTING_HOUR_RATE_EUR}/h",
     )
 
-    # --- Agent 3: Risk Analyst ---
-    agent3_value = BASE_AUDIT_FEE_EUR + (total_var_impact * AUDIT_RISK_PERCENT)
-    agent3_value = round(agent3_value, 2)
-    agent3_margin = (
-        ((agent3_value - agent3_api_cost) / agent3_value) * 100
-        if agent3_value > 0
-        else 0.0
-    )
     line_agent3 = InvoiceLineItem(
         agent="Risk Analyst",
         event="risk_assessment_completed",
-        human_equivalent_value_eur=agent3_value,
+        human_equivalent_value_eur=agent3_consulting,
         api_compute_cost_eur=round(agent3_api_cost, 4),
-        gross_margin_percent=round(agent3_margin, 2),
-        detail=f"€{BASE_AUDIT_FEE_EUR} base + 0.01% of €{total_var_impact:,.2f} VaR",
+        gross_margin_percent=round(
+            ((agent3_consulting - agent3_api_cost) / agent3_consulting) * 100
+            if agent3_consulting > 0 else 0.0, 2
+        ),
+        detail=f"EUR{BASE_AUDIT_FEE_EUR} base + 0.01% of EUR{total_var_impact:,.0f} VaR",
     )
 
-    # --- Agent 4: Executive Strategist ---
-    agent4_value = CRISIS_STRATEGY_FEE_EUR
-    agent4_margin = (
-        ((agent4_value - agent4_api_cost) / agent4_value) * 100
-        if agent4_value > 0
-        else 0.0
-    )
     line_agent4 = InvoiceLineItem(
         agent="Executive Strategist",
         event="crisis_strategy_delivered",
-        human_equivalent_value_eur=agent4_value,
+        human_equivalent_value_eur=agent4_consulting,
         api_compute_cost_eur=round(agent4_api_cost, 4),
-        gross_margin_percent=round(agent4_margin, 2),
-        detail="Full crisis mitigation plan (fixed fee)",
+        gross_margin_percent=round(
+            ((agent4_consulting - agent4_api_cost) / agent4_consulting) * 100
+            if agent4_consulting > 0 else 0.0, 2
+        ),
+        detail="Full crisis mitigation plan + communication drafts",
     )
 
-    # --- Totals ---
     line_items = [line_agent2, line_agent3, line_agent4]
-    total_human = sum(li.human_equivalent_value_eur for li in line_items)
-    total_api = sum(li.api_compute_cost_eur for li in line_items)
-    total_margin = (
-        ((total_human - total_api) / total_human) * 100
-        if total_human > 0
-        else 0.0
+
+    tier_margin = (
+        ((tier_price - total_api) / tier_price) * 100
+        if tier_price > 0 else 0.0
     )
-    roi_mult = total_human / total_api if total_api > 0 else 0.0
+    roi_mult = tier_price / total_api if total_api > 0 else 0.0
 
     invoice_summary = (
-        f"Crisis response delivered for €{total_api:.2f} in API costs — "
-        f"equivalent to €{total_human:,.2f} in traditional consulting fees "
-        f"({roi_mult:,.0f}× ROI)."
+        f"{tier_label} — {tier_name} tier: EUR{tier_price:,.0f}. "
+        f"A traditional agency would charge EUR{total_consulting:,.0f} for the same deliverables. "
+        f"You save EUR{total_consulting - tier_price:,.0f}."
     )
 
     trade_off = (
-        f"A traditional PR agency would charge €{total_human:,.2f} for this level of crisis response: "
-        f"€{agent2_value:,.2f} for precedent research ({hours_saved}h of analyst work), "
-        f"€{agent3_value:,.2f} for financial risk assessment, and "
-        f"€{agent4_value:,.2f} for strategy development with communication drafts. "
-        f"Our AI agents delivered identical outputs in under 60 seconds "
-        f"at {total_margin:.1f}% gross margin, saving the client €{total_human - total_api:,.2f}."
+        f"A traditional PR agency would charge EUR{total_consulting:,.0f} for this level of crisis response: "
+        f"EUR{agent2_consulting:,.0f} for precedent research ({hours_saved}h of analyst work), "
+        f"EUR{agent3_consulting:,.0f} for financial risk assessment, and "
+        f"EUR{agent4_consulting:,.0f} for strategy development with communication drafts. "
+        f"Crisis PR Agent delivers identical outputs in under 75 seconds "
+        f"for EUR{tier_price:,.0f} ({tier_name} tier) — "
+        f"that's {total_consulting / tier_price:.0f}x cheaper than a consulting agency."
     )
 
     return Agent5Output(
+        tier_name=tier_name,
+        tier_label=tier_label,
+        tier_price_eur=tier_price,
         line_items=line_items,
-        total_human_equivalent_eur=round(total_human, 2),
-        total_api_cost_eur=round(total_api, 4),
-        total_gross_margin_percent=round(total_margin, 2),
+        total_human_equivalent_eur=round(total_consulting, 2),
+        total_api_cost_eur=total_api,
+        total_gross_margin_percent=round(tier_margin, 2),
         roi_multiplier=round(roi_mult, 1),
         invoice_summary=invoice_summary,
         trade_off_reasoning=trade_off,

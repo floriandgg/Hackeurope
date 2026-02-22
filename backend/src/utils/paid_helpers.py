@@ -31,10 +31,22 @@ paid_client = Paid(token=PAID_API_KEY) if (Paid is not None and PAID_API_KEY) el
 # Product constants
 EXTERNAL_PRODUCT_ID = "pr-crisis-swarm-001"
 
-# Reference rates
+# Tier-based pricing (pitch-ready)
+TIER_PRICING: dict[str, dict] = {
+    "IGNORE": {"name": "Dismissed",     "price": 99.0,   "label": "Fausse Alerte"},
+    "SOFT":   {"name": "Dismissed",     "price": 99.0,   "label": "Fausse Alerte"},
+    "MEDIUM": {"name": "Shield",        "price": 999.0,  "label": "Crise Modérée"},
+    "CRITICAL":{"name": "Full Defense", "price": 2499.0, "label": "Crise Majeure"},
+}
+
+def get_tier(alert_level: str) -> dict:
+    """Return tier info for the given alert level."""
+    return TIER_PRICING.get(alert_level.upper(), TIER_PRICING["MEDIUM"])
+
+# Reference rates (used for per-agent breakdown / consulting comparison)
 CONSULTING_HOUR_RATE_EUR = 150
 BASE_AUDIT_FEE_EUR = 500
-AUDIT_RISK_PERCENT = 0.0001  # 0.01% of financial risk
+AUDIT_RISK_PERCENT = 0.0001
 CRISIS_STRATEGY_FEE_EUR = 2500.00
 
 
@@ -73,39 +85,33 @@ def emit_agent2_signal(
     past_cases: list,
     global_lesson: str,
     api_compute_cost_eur: float,
+    alert_level: str = "MEDIUM",
 ) -> None:
-    """
-    Agent 2 — Historical Strategist.
-    Business Outcome: Precedents found = consulting hours saved.
-    """
+    """Agent 2 — Historical Strategist."""
+    tier = get_tier(alert_level)
     cases_count = len(past_cases)
-    hours_saved = cases_count * 3  # 3h consulting per case
+    hours_saved = cases_count * 3
     consulting_value = hours_saved * CONSULTING_HOUR_RATE_EUR
-
-    gross_margin_percent = (
-        ((consulting_value - api_compute_cost_eur) / consulting_value) * 100
-        if consulting_value > 0
-        else 0.0
-    )
 
     signal = _build_signal(
         event_name="historical_precedents_extracted",
         customer_external_id=customer_external_id,
         idempotency_key=f"agent2_{crisis_id}_{uuid.uuid4().hex[:6]}",
         data={
+            "tier": tier["name"],
+            "tier_price_eur": tier["price"],
             "cases_found": cases_count,
             "estimated_hours_saved": hours_saved,
             "human_equivalent_value_eur": consulting_value,
             "api_compute_cost_eur": api_compute_cost_eur,
-            "agent_gross_margin_percent": round(gross_margin_percent, 2),
             "key_lesson": (global_lesson or "")[:100],
         },
     )
 
     if _send_signal(signal, "AGENT 2"):
         print(
-            f"[PAID.AI - AGENT 2] Signal sent. Value: {consulting_value}€ "
-            f"(API cost: {api_compute_cost_eur}€, Margin: {gross_margin_percent:.2f}%)."
+            f"[PAID.AI - AGENT 2] Signal sent. Tier: {tier['name']} (€{tier['price']}), "
+            f"Consulting equiv: €{consulting_value} (API cost: €{api_compute_cost_eur})."
         )
 
 
@@ -115,40 +121,31 @@ def emit_agent3_signal(
     estimated_financial_loss: float,
     severity_score: int,
     api_compute_cost_eur: float,
+    alert_level: str = "MEDIUM",
 ) -> None:
-    """
-    Agent 3 — Impact Estimator (Risk Assessment).
-    Business Outcome: Financial impact modeling.
-    Fee = base 500€ + 0.01% of risk.
-    """
-    audit_fee_eur = BASE_AUDIT_FEE_EUR + (estimated_financial_loss * AUDIT_RISK_PERCENT)
-    audit_fee_eur = round(audit_fee_eur, 2)
-
-    gross_margin_percent = (
-        ((audit_fee_eur - api_compute_cost_eur) / audit_fee_eur) * 100
-        if audit_fee_eur > 0
-        else 0.0
-    )
+    """Agent 3 — Impact Estimator (Risk Assessment)."""
+    tier = get_tier(alert_level)
+    audit_fee_eur = round(BASE_AUDIT_FEE_EUR + (estimated_financial_loss * AUDIT_RISK_PERCENT), 2)
 
     signal = _build_signal(
         event_name="risk_assessment_completed",
         customer_external_id=customer_external_id,
         idempotency_key=f"agent3_{crisis_id}_{uuid.uuid4().hex[:6]}",
         data={
+            "tier": tier["name"],
+            "tier_price_eur": tier["price"],
             "severity_score_1_to_5": severity_score,
             "estimated_financial_exposure": estimated_financial_loss,
             "audit_fee_eur": audit_fee_eur,
-            "audit_type": "Automated Financial Exposure Assessment",
             "human_equivalent_value_eur": audit_fee_eur,
             "api_compute_cost_eur": api_compute_cost_eur,
-            "agent_gross_margin_percent": round(gross_margin_percent, 2),
         },
     )
 
     if _send_signal(signal, "AGENT 3"):
         print(
-            f"[PAID.AI - AGENT 3] Signal sent. Value: {audit_fee_eur}€ "
-            f"(API cost: {api_compute_cost_eur}€, Margin: {gross_margin_percent:.2f}%)."
+            f"[PAID.AI - AGENT 3] Signal sent. Tier: {tier['name']} (€{tier['price']}), "
+            f"Audit equiv: €{audit_fee_eur} (API cost: €{api_compute_cost_eur})."
         )
 
 
@@ -158,37 +155,86 @@ def emit_agent4_signal(
     recommended_strategy_name: str,
     drafts_generated: int,
     api_compute_cost_eur: float,
+    alert_level: str = "MEDIUM",
 ) -> None:
-    """
-    Agent 4 — Executive Strategist.
-    Business Outcome: Full crisis plan (premium deliverable).
-    Should only emit if strategies were generated successfully.
-    """
-    crisis_management_fee = CRISIS_STRATEGY_FEE_EUR
-
-    gross_margin_percent = (
-        ((crisis_management_fee - api_compute_cost_eur) / crisis_management_fee) * 100
-        if crisis_management_fee > 0
-        else 0.0
-    )
+    """Agent 4 — Executive Strategist."""
+    tier = get_tier(alert_level)
 
     signal = _build_signal(
         event_name="crisis_strategy_delivered",
         customer_external_id=customer_external_id,
         idempotency_key=f"agent4_{crisis_id}_{uuid.uuid4().hex[:6]}",
         data={
+            "tier": tier["name"],
+            "tier_price_eur": tier["price"],
             "recommended_strategy": recommended_strategy_name,
             "assets_drafted": drafts_generated,
-            "strategy_fee_eur": crisis_management_fee,
-            "deliverable_type": "Full Crisis Mitigation Plan",
-            "human_equivalent_value_eur": crisis_management_fee,
+            "strategy_fee_eur": CRISIS_STRATEGY_FEE_EUR,
+            "human_equivalent_value_eur": CRISIS_STRATEGY_FEE_EUR,
             "api_compute_cost_eur": api_compute_cost_eur,
-            "agent_gross_margin_percent": round(gross_margin_percent, 2),
         },
     )
 
     if _send_signal(signal, "AGENT 4"):
         print(
-            f"[PAID.AI - AGENT 4] Signal sent. Value: {crisis_management_fee}€ "
-            f"(API cost: {api_compute_cost_eur}€, Margin: {gross_margin_percent:.2f}%)."
+            f"[PAID.AI - AGENT 4] Signal sent. Tier: {tier['name']} (€{tier['price']}), "
+            f"Strategy equiv: €{CRISIS_STRATEGY_FEE_EUR} (API cost: €{api_compute_cost_eur})."
         )
+
+
+# ---------------------------------------------------------------------------
+# Checkout (order-based) — creates customer + order in Paid.ai
+# ---------------------------------------------------------------------------
+
+FRONTEND_URL = os.getenv("FRONTEND_URL", "http://localhost:5173")
+
+
+def create_checkout(
+    customer_email: str,
+    company_name: str,
+    tier_name: str,
+    tier_price_eur: float,
+    crisis_id: str,
+) -> dict:
+    """
+    Create a customer and an order in Paid.ai for the given crisis tier.
+    Returns {"order_id": ..., "customer_id": ...} on success.
+    """
+    if not paid_client:
+        print("[PAID.AI] Client not configured — checkout skipped.")
+        return {"error": "Paid.ai client not configured", "order_id": None}
+
+    try:
+        customer_ext_id = f"crisis_{crisis_id}_{uuid.uuid4().hex[:6]}"
+
+        customer = paid_client.customers.create_customer(
+            name=company_name,
+            email=customer_email,
+            external_id=customer_ext_id,
+            metadata={"source": "crisis-pr-agent", "tier": tier_name},
+        )
+        customer_id = customer.id
+        print(f"[PAID.AI] Customer created: {customer_id} ({customer_ext_id})")
+
+        order = paid_client.orders.create_order(
+            customer_id=customer_id,
+            name=f"Crisis PR — {tier_name} (EUR{tier_price_eur:.0f})",
+            external_id=f"order_{crisis_id}_{uuid.uuid4().hex[:6]}",
+            metadata={
+                "tier": tier_name,
+                "price_eur": tier_price_eur,
+                "company": company_name,
+            },
+        )
+        order_id = order.id
+        print(f"[PAID.AI] Order created: {order_id}")
+
+        return {
+            "order_id": order_id,
+            "customer_id": customer_id,
+            "customer_external_id": customer_ext_id,
+        }
+
+    except Exception as e:
+        print(f"[PAID.AI] Checkout error: {e}")
+        return {"error": str(e), "order_id": None}

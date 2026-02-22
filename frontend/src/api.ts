@@ -252,6 +252,9 @@ interface BackendInvoiceLineItem {
 
 /** Full invoice from the backend */
 interface BackendInvoice {
+  tier_name: string;
+  tier_label: string;
+  tier_price_eur: number;
   line_items: BackendInvoiceLineItem[];
   total_human_equivalent_eur: number;
   total_api_cost_eur: number;
@@ -275,6 +278,9 @@ export interface InvoiceLineItem {
 
 /** Frontend-ready invoice data */
 export interface InvoiceData {
+  tierName: string;
+  tierLabel: string;
+  tierPriceEur: number;
   lineItems: InvoiceLineItem[];
   totalHumanEquivalentEur: number;
   totalApiCostEur: number;
@@ -391,6 +397,9 @@ export function transformStrategyReport(data: CrisisResponseResponse): StrategyD
 
 export function transformInvoice(data: BackendInvoice): InvoiceData {
   return {
+    tierName: data.tier_name || '',
+    tierLabel: data.tier_label || '',
+    tierPriceEur: data.tier_price_eur || 0,
     lineItems: (data.line_items || []).map((li) => ({
       agent: li.agent,
       event: li.event,
@@ -673,6 +682,9 @@ const MOCK_STRATEGY_DATA: StrategyData = {
 /* ─── Debug mock data: Agent 5 ─── */
 
 const MOCK_INVOICE_DATA: InvoiceData = {
+  tierName: 'Shield',
+  tierLabel: 'Crise Mod\u00e9r\u00e9e',
+  tierPriceEur: 999,
   lineItems: [
     {
       agent: 'Historical Strategist',
@@ -680,7 +692,7 @@ const MOCK_INVOICE_DATA: InvoiceData = {
       humanEquivalentValueEur: 1800,
       apiComputeCostEur: 0.122,
       grossMarginPercent: 99.99,
-      detail: '4 cases \u00d7 3h \u00d7 \u20ac150/h',
+      detail: '4 cases x 3h x EUR150/h',
     },
     {
       agent: 'Risk Analyst',
@@ -688,7 +700,7 @@ const MOCK_INVOICE_DATA: InvoiceData = {
       humanEquivalentValueEur: 504.52,
       apiComputeCostEur: 0.048,
       grossMarginPercent: 99.99,
-      detail: '\u20ac500 base + 0.01% of \u20ac45,200 VaR',
+      detail: 'EUR500 base + 0.01% of EUR45,200 VaR',
     },
     {
       agent: 'Executive Strategist',
@@ -696,15 +708,15 @@ const MOCK_INVOICE_DATA: InvoiceData = {
       humanEquivalentValueEur: 2500,
       apiComputeCostEur: 0.02,
       grossMarginPercent: 99.99,
-      detail: 'Full crisis mitigation plan (fixed fee)',
+      detail: 'Full crisis mitigation plan + communication drafts',
     },
   ],
   totalHumanEquivalentEur: 4804.52,
   totalApiCostEur: 0.19,
-  totalGrossMarginPercent: 99.99,
-  roiMultiplier: 25287,
-  invoiceSummary: 'Crisis response delivered for \u20ac0.19 in API costs \u2014 equivalent to \u20ac4,804.52 in traditional consulting fees (25,287\u00d7 ROI).',
-  tradeOffReasoning: 'A traditional PR agency would charge \u20ac4,804.52 for this level of crisis response: \u20ac1,800.00 for precedent research (12h of analyst work), \u20ac504.52 for financial risk assessment, and \u20ac2,500.00 for strategy development with communication drafts. Our AI agents delivered identical outputs in under 60 seconds at 99.99% gross margin, saving the client \u20ac4,804.33.',
+  totalGrossMarginPercent: 99.98,
+  roiMultiplier: 5257,
+  invoiceSummary: 'Crise Mod\u00e9r\u00e9e \u2014 Shield tier: EUR999. A traditional agency would charge EUR4,805 for the same deliverables. You save EUR3,806.',
+  tradeOffReasoning: 'A traditional PR agency would charge EUR4,805 for this level of crisis response: EUR1,800 for precedent research (12h of analyst work), EUR505 for financial risk assessment, and EUR2,500 for strategy development with communication drafts. Crisis PR Agent delivers identical outputs in under 75 seconds for EUR999 (Shield tier) \u2014 that\u2019s 5x cheaper than a consulting agency.',
   actionRefused: false,
   refusalReason: '',
 };

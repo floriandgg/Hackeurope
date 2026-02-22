@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useRef } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import type { InvoiceData } from '../api';
 
 /* ─── Types ─── */
@@ -44,31 +44,6 @@ function getAgentAccent(agent: string): AgentAccent {
   return { color: '#059669', bg: 'rgba(5,150,105,0.06)', border: 'rgba(5,150,105,0.18)', icon: 'M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z' };
 }
 
-/* ─── Animated count-up hook ─── */
-
-function useCountUp(target: number, duration = 2000, enabled = false) {
-  const [value, setValue] = useState(0);
-  const rafRef = useRef(0);
-
-  useEffect(() => {
-    if (!enabled || target <= 0) {
-      setValue(0);
-      return;
-    }
-    const start = performance.now();
-    const animate = (now: number) => {
-      const progress = Math.min((now - start) / duration, 1);
-      const eased = 1 - Math.pow(1 - progress, 3);
-      setValue(Math.round(target * eased));
-      if (progress < 1) rafRef.current = requestAnimationFrame(animate);
-    };
-    rafRef.current = requestAnimationFrame(animate);
-    return () => cancelAnimationFrame(rafRef.current);
-  }, [target, duration, enabled]);
-
-  return value;
-}
-
 /* ─── Animated bar width hook ─── */
 
 function useAnimatedWidth(targetPercent: number, enabled: boolean, delay = 0) {
@@ -94,11 +69,6 @@ function formatApiCost(value: number): string {
   return `\u20ac${value.toFixed(2)}`;
 }
 
-function formatSavings(agency: number, ai: number): string {
-  const saved = agency - ai;
-  return formatEur(saved);
-}
-
 /* ─── Main Page ─── */
 
 export default function InvoicePage({
@@ -114,12 +84,11 @@ export default function InvoicePage({
   const [showSummary, setShowSummary] = useState(false);
   const [showTradeOff, setShowTradeOff] = useState(false);
   const [showTotals, setShowTotals] = useState(false);
-
-  const displayROI = useCountUp(
-    invoiceData?.roiMultiplier ?? 0,
-    1800,
-    showHero,
-  );
+  const [showCheckout, setShowCheckout] = useState(false);
+  const [checkoutLoading, setCheckoutLoading] = useState(false);
+  const [checkoutDone, setCheckoutDone] = useState(false);
+  const [checkoutError, setCheckoutError] = useState<string | null>(null);
+  const [emailInput, setEmailInput] = useState('');
 
   // Mount animation — data is pre-loaded, so animate quickly
   useEffect(() => {
@@ -143,6 +112,7 @@ export default function InvoicePage({
     timers.push(setTimeout(() => setShowTotals(true), afterItems + 150));
     timers.push(setTimeout(() => setShowTradeOff(true), afterItems + 350));
     timers.push(setTimeout(() => setShowSummary(true), afterItems + 550));
+    timers.push(setTimeout(() => setShowCheckout(true), afterItems + 750));
 
     return () => timers.forEach(clearTimeout);
   }, [invoiceData]);
@@ -150,6 +120,34 @@ export default function InvoicePage({
   const handleBackToStrategy = useCallback(() => {
     onBack();
   }, [onBack]);
+
+  const handleCheckout = useCallback(async () => {
+    if (!emailInput.trim() || !invoiceData) return;
+    setCheckoutLoading(true);
+    setCheckoutError(null);
+    try {
+      const res = await fetch('/api/checkout', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          customer_email: emailInput.trim(),
+          company_name: companyName,
+          tier_name: invoiceData.tierName,
+          tier_price_eur: invoiceData.tierPriceEur,
+        }),
+      });
+      const data = await res.json();
+      if (data.success) {
+        setCheckoutDone(true);
+      } else {
+        setCheckoutError(data.error || 'Checkout failed');
+      }
+    } catch (err) {
+      setCheckoutError(err instanceof Error ? err.message : 'Network error');
+    } finally {
+      setCheckoutLoading(false);
+    }
+  }, [emailInput, invoiceData, companyName]);
 
   if (!invoiceData) {
     return (
@@ -160,7 +158,9 @@ export default function InvoicePage({
   }
 
   const isRefused = invoiceData.actionRefused;
-  const totalSaved = invoiceData.totalHumanEquivalentEur - invoiceData.totalApiCostEur;
+  const tierPrice = invoiceData.tierPriceEur || 0;
+  const agencyCost = invoiceData.totalHumanEquivalentEur;
+  const totalSaved = agencyCost - tierPrice;
 
   return (
     <div className="relative min-h-screen overflow-hidden bg-white">
@@ -335,10 +335,10 @@ export default function InvoicePage({
                   <div className="grid grid-cols-2 gap-3">
                     <div>
                       <p className="text-lg font-display text-royal">
-                        {isRefused ? '\u2014' : `${displayROI.toLocaleString()}\u00d7`}
+                        {isRefused ? '\u2014' : formatEur(tierPrice)}
                       </p>
                       <p className="text-[10px] text-storm mt-0.5">
-                        ROI Multiplier
+                        {invoiceData.tierName || 'Tier'} Price
                       </p>
                     </div>
                     <div>
@@ -346,7 +346,7 @@ export default function InvoicePage({
                         {invoiceData.lineItems.length}
                       </p>
                       <p className="text-[10px] text-storm mt-0.5">
-                        Agents Billed
+                        Agents Used
                       </p>
                     </div>
                   </div>
@@ -431,41 +431,43 @@ export default function InvoicePage({
                     transition: 'opacity 0.7s cubic-bezier(0.16,1,0.3,1), transform 0.7s cubic-bezier(0.16,1,0.3,1)',
                   }}
                 >
-                  {/* Agency Cost */}
+                  {/* Tier + Price */}
+                  <div className="relative p-4 lg:p-5 rounded-xl bg-royal/[0.03] border border-royal/12 shadow-[0_1px_8px_rgba(43,58,143,0.05)] overflow-hidden">
+                    <div className="absolute top-0 left-0 w-full h-[2px] bg-gradient-to-r from-royal to-royal/30" />
+                    <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_bottom_right,rgba(43,58,143,0.04),transparent_60%)] pointer-events-none" />
+                    <p className="text-[10px] font-body font-medium text-royal/60 tracking-wider uppercase mb-2 relative">
+                      {invoiceData.tierName || 'Plan'}
+                    </p>
+                    <p className="text-xl lg:text-2xl font-display text-royal relative" style={{ fontFeatureSettings: '"tnum"' }}>
+                      {formatEur(tierPrice)}
+                    </p>
+                    <p className="text-[10px] text-royal/50 mt-1 relative">{invoiceData.tierLabel || 'tier pricing'}</p>
+                  </div>
+
+                  {/* Agency Would Charge */}
                   <div className="relative p-4 lg:p-5 rounded-xl bg-white/80 border border-mist shadow-[0_1px_8px_rgba(0,0,0,0.03)] overflow-hidden">
                     <div className="absolute top-0 left-0 w-full h-[2px] bg-gradient-to-r from-storm/20 to-storm/5" />
                     <p className="text-[10px] font-body font-medium text-storm/60 tracking-wider uppercase mb-2">
                       Agency Cost
                     </p>
                     <p className="text-xl lg:text-2xl font-display text-storm/40 line-through decoration-storm/20" style={{ fontFeatureSettings: '"tnum"' }}>
-                      {formatEur(invoiceData.totalHumanEquivalentEur)}
+                      {formatEur(agencyCost)}
                     </p>
                     <p className="text-[10px] text-storm/40 mt-1">traditional consulting</p>
                   </div>
 
-                  {/* AI Cost */}
-                  <div className="relative p-4 lg:p-5 rounded-xl bg-white/80 border border-royal/10 shadow-[0_1px_8px_rgba(43,58,143,0.04)] overflow-hidden">
-                    <div className="absolute top-0 left-0 w-full h-[2px] bg-gradient-to-r from-royal/40 to-royal/10" />
-                    <p className="text-[10px] font-body font-medium text-royal/60 tracking-wider uppercase mb-2">
-                      AI Cost
+                  {/* You Save */}
+                  <div className="relative p-4 lg:p-5 rounded-xl bg-emerald-50/60 border border-emerald-200/30 shadow-[0_1px_8px_rgba(5,150,105,0.04)] overflow-hidden">
+                    <div className="absolute top-0 left-0 w-full h-[2px] bg-gradient-to-r from-emerald-500/40 to-emerald-500/10" />
+                    <p className="text-[10px] font-body font-medium text-emerald-700/60 tracking-wider uppercase mb-2">
+                      You Save
                     </p>
-                    <p className="text-xl lg:text-2xl font-display text-royal" style={{ fontFeatureSettings: '"tnum"' }}>
-                      {formatApiCost(invoiceData.totalApiCostEur)}
+                    <p className="text-xl lg:text-2xl font-display text-emerald-700" style={{ fontFeatureSettings: '"tnum"' }}>
+                      {formatEur(totalSaved)}
                     </p>
-                    <p className="text-[10px] text-royal/50 mt-1">agents pipeline</p>
-                  </div>
-
-                  {/* ROI */}
-                  <div className="relative p-4 lg:p-5 rounded-xl bg-royal/[0.03] border border-royal/12 shadow-[0_1px_8px_rgba(43,58,143,0.05)] overflow-hidden">
-                    <div className="absolute top-0 left-0 w-full h-[2px] bg-gradient-to-r from-royal to-royal/30" />
-                    <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_bottom_right,rgba(43,58,143,0.04),transparent_60%)] pointer-events-none" />
-                    <p className="text-[10px] font-body font-medium text-royal/60 tracking-wider uppercase mb-2 relative">
-                      ROI
+                    <p className="text-[10px] text-emerald-600/50 mt-1">
+                      {agencyCost > 0 ? `${Math.round((totalSaved / agencyCost) * 100)}% less` : ''}
                     </p>
-                    <p className="text-xl lg:text-2xl font-display text-royal relative" style={{ fontFeatureSettings: '"tnum"' }}>
-                      {displayROI.toLocaleString()}<span className="text-base lg:text-lg">&times;</span>
-                    </p>
-                    <p className="text-[10px] text-royal/50 mt-1 relative">cost reduction</p>
                   </div>
                 </div>
 
@@ -510,7 +512,7 @@ export default function InvoicePage({
                             Total Savings
                           </h4>
                           <span className="text-[11px] font-body font-medium text-royal px-2.5 py-0.5 rounded-full bg-royal/[0.06]">
-                            {displayROI.toLocaleString()}&times; ROI
+                            {agencyCost > 0 ? `${Math.round(agencyCost / tierPrice)}` : '0'}&times; cheaper
                           </span>
                         </div>
 
@@ -518,7 +520,7 @@ export default function InvoicePage({
                         <div className="space-y-2.5">
                           <CostBar
                             label="Agency"
-                            value={formatEur(invoiceData.totalHumanEquivalentEur)}
+                            value={formatEur(agencyCost)}
                             percent={100}
                             color="#b4b8c0"
                             bgColor="rgba(180,184,192,0.12)"
@@ -526,9 +528,9 @@ export default function InvoicePage({
                             strikethrough
                           />
                           <CostBar
-                            label="AI"
-                            value={formatApiCost(invoiceData.totalApiCostEur)}
-                            percent={Math.max(0.5, (invoiceData.totalApiCostEur / invoiceData.totalHumanEquivalentEur) * 100)}
+                            label={invoiceData.tierName || 'AI'}
+                            value={formatEur(tierPrice)}
+                            percent={Math.max(2, (tierPrice / agencyCost) * 100)}
                             color="#2b3a8f"
                             bgColor="rgba(43,58,143,0.08)"
                             enabled={showTotals}
@@ -543,10 +545,10 @@ export default function InvoicePage({
                           You Saved
                         </p>
                         <p className="text-2xl font-display text-royal" style={{ fontFeatureSettings: '"tnum"' }}>
-                          {formatSavings(invoiceData.totalHumanEquivalentEur, invoiceData.totalApiCostEur)}
+                          {formatEur(totalSaved)}
                         </p>
                         <p className="text-[10px] text-storm/50 mt-0.5">
-                          {invoiceData.totalGrossMarginPercent.toFixed(1)}% gross margin
+                          vs traditional agency
                         </p>
                       </div>
                     </div>
@@ -577,6 +579,98 @@ export default function InvoicePage({
                         </p>
                       </div>
                     </div>
+                  </div>
+                )}
+
+                {/* ──── Checkout CTA ──── */}
+                {showCheckout && !isRefused && (
+                  <div
+                    className="rounded-2xl overflow-hidden border border-royal/15 shadow-[0_4px_30px_rgba(43,58,143,0.08)] shrink-0
+                               opacity-0 animate-fade-in-up"
+                    style={{ animationDelay: '100ms' }}
+                  >
+                    {checkoutDone ? (
+                      <div className="p-8 text-center bg-gradient-to-b from-emerald-50/50 to-white">
+                        <div className="w-14 h-14 mx-auto mb-4 rounded-full bg-emerald-100 flex items-center justify-center">
+                          <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="#059669" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                            <path d="M20 6L9 17l-5-5" />
+                          </svg>
+                        </div>
+                        <h3 className="text-lg font-display text-charcoal mb-1">Order Confirmed</h3>
+                        <p className="text-sm font-body text-storm">
+                          {invoiceData.tierName} plan activated for {companyName}.
+                          <br />
+                          <span className="text-emerald-700 font-medium">A confirmation will be sent to your email.</span>
+                        </p>
+                      </div>
+                    ) : (
+                      <div className="bg-gradient-to-b from-royal/[0.02] to-white">
+                        <div className="px-6 pt-6 pb-2 text-center">
+                          <p className="text-[10px] font-body font-medium text-royal/60 tracking-[0.15em] uppercase mb-1">
+                            Activate Now
+                          </p>
+                          <h3 className="text-2xl font-display text-charcoal">
+                            {invoiceData.tierLabel}
+                            <span className="text-royal ml-2">{formatEur(tierPrice)}</span>
+                          </h3>
+                          <p className="text-xs font-body text-storm/60 mt-1">
+                            {invoiceData.tierName} tier — instant crisis defense
+                          </p>
+                        </div>
+
+                        <div className="px-6 pb-6 pt-4">
+                          <div className="flex flex-col sm:flex-row gap-3">
+                            <input
+                              type="email"
+                              placeholder="your@email.com"
+                              value={emailInput}
+                              onChange={(e) => setEmailInput(e.target.value)}
+                              onKeyDown={(e) => e.key === 'Enter' && handleCheckout()}
+                              className="flex-1 px-4 py-3 rounded-xl border border-mist bg-white text-sm
+                                         font-body text-charcoal placeholder:text-storm/30
+                                         focus:outline-none focus:ring-2 focus:ring-royal/20 focus:border-royal/30
+                                         transition-all"
+                            />
+                            <button
+                              onClick={handleCheckout}
+                              disabled={checkoutLoading || !emailInput.trim()}
+                              className="px-8 py-3 rounded-xl font-body font-medium text-sm text-white
+                                         bg-gradient-to-r from-royal to-royal/90
+                                         shadow-[0_2px_12px_rgba(43,58,143,0.25)]
+                                         hover:shadow-[0_4px_20px_rgba(43,58,143,0.35)]
+                                         hover:from-royal/95 hover:to-royal
+                                         disabled:opacity-50 disabled:cursor-not-allowed
+                                         transition-all duration-200 whitespace-nowrap"
+                            >
+                              {checkoutLoading ? (
+                                <span className="flex items-center gap-2">
+                                  <svg className="animate-spin h-4 w-4" viewBox="0 0 24 24">
+                                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none" />
+                                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+                                  </svg>
+                                  Processing...
+                                </span>
+                              ) : (
+                                `Pay ${formatEur(tierPrice)}`
+                              )}
+                            </button>
+                          </div>
+                          {checkoutError && (
+                            <p className="text-xs text-red-500 mt-2 text-center">{checkoutError}</p>
+                          )}
+                          <div className="flex items-center justify-center gap-4 mt-4 text-[10px] text-storm/40">
+                            <span className="flex items-center gap-1">
+                              <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                                <rect x="3" y="11" width="18" height="11" rx="2" ry="2" />
+                                <path d="M7 11V7a5 5 0 0110 0v4" />
+                              </svg>
+                              Secure checkout
+                            </span>
+                            <span>Powered by Paid.ai</span>
+                          </div>
+                        </div>
+                      </div>
+                    )}
                   </div>
                 )}
               </>

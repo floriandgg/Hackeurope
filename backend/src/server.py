@@ -34,6 +34,7 @@ from src.agents.agent_3_scorer.node import scorer_from_articles
 from src.agents.agent_4_strategist.node import strategist_from_data
 from src.agents.agent_5_cfo.node import cfo_from_data
 from src.agents.agent_6_hijacker.node import hijacker_from_data
+from src.utils.paid_helpers import create_checkout
 
 app = FastAPI(title="Crisis PR Agent API")
 
@@ -184,6 +185,39 @@ def hijacker(req: HijackerRequest):
         "ads_keywords": result.get("hijacker_ads_keywords", 0),
         "ads_budget_eur": result.get("hijacker_ads_budget_eur", 0.0),
         "api_cost_eur": result.get("agent6_api_cost_eur", 0.0),
+    }
+
+
+class CheckoutRequest(BaseModel):
+    customer_email: str
+    company_name: str
+    tier_name: str
+    tier_price_eur: float
+    crisis_id: str = ""
+
+
+@app.post("/api/checkout")
+def checkout(req: CheckoutRequest):
+    """Create a Paid.ai order for the crisis response tier."""
+    import uuid as _uuid
+    crisis_id = req.crisis_id or _uuid.uuid4().hex[:8]
+
+    result = create_checkout(
+        customer_email=req.customer_email,
+        company_name=req.company_name,
+        tier_name=req.tier_name,
+        tier_price_eur=req.tier_price_eur,
+        crisis_id=crisis_id,
+    )
+
+    if result.get("error"):
+        return {"success": False, "error": result["error"]}
+
+    return {
+        "success": True,
+        "order_id": result["order_id"],
+        "customer_id": result["customer_id"],
+        "message": f"Order created for {req.tier_name} tier (EUR{req.tier_price_eur:.0f})",
     }
 
 
