@@ -238,6 +238,106 @@ function transformPrecedents(data: PrecedentsResponse): PrecedentsData {
   };
 }
 
+/* ─── Agent 4 types ─── */
+
+/** Single strategy from the backend */
+interface BackendCrisisStrategy {
+  name: string;
+  description: string;
+  tone: string;
+  channels: string[];
+  key_actions: string[];
+  estimated_cost_eur: number;
+  estimated_impact: string;
+  roi_score: number;
+}
+
+/** Full strategy report from the backend */
+interface BackendStrategyReport {
+  alert_level: string;
+  alert_reasoning: string;
+  recommended_action: string;
+  strategies: BackendCrisisStrategy[];
+  recommended_strategy: string;
+  recommendation_reasoning: string;
+  press_release: string;
+  internal_email: string;
+  social_post: string;
+  legal_notice_draft: string;
+  decision_summary: string;
+}
+
+/** Full response from POST /api/crisis-response */
+interface CrisisResponseResponse {
+  strategy_report: BackendStrategyReport;
+  recommended_strategy_name: string;
+  precedents: BackendPrecedent[];
+  global_lesson: string;
+  confidence: string;
+}
+
+/** Frontend-ready strategy (one of 3) */
+export interface FrontendStrategy {
+  name: string;
+  description: string;
+  tone: string;
+  channels: string[];
+  keyActions: string[];
+  estimatedCostEur: number;
+  estimatedImpact: string;
+  roiScore: number;
+}
+
+/** Frontend-ready strategy data */
+export interface StrategyData {
+  alertLevel: string;
+  alertReasoning: string;
+  recommendedAction: string;
+  strategies: FrontendStrategy[];
+  recommendedStrategy: string;
+  recommendationReasoning: string;
+  drafts: {
+    pressRelease: string;
+    internalEmail: string;
+    socialPost: string;
+    legalNotice: string;
+  };
+  decisionSummary: string;
+}
+
+/* ─── Transform: Agent 4 ─── */
+
+function transformStrategyReport(data: CrisisResponseResponse): StrategyData {
+  const r = data.strategy_report;
+  if (!r || !r.strategies || r.strategies.length === 0) {
+    throw new Error('Backend returned empty strategy report — Agent 4 may have failed.');
+  }
+  return {
+    alertLevel: r.alert_level || 'MEDIUM',
+    alertReasoning: r.alert_reasoning || '',
+    recommendedAction: r.recommended_action || 'communicate',
+    strategies: r.strategies.map((s) => ({
+      name: s.name,
+      description: s.description || '',
+      tone: s.tone || '',
+      channels: s.channels || [],
+      keyActions: s.key_actions || [],
+      estimatedCostEur: s.estimated_cost_eur || 0,
+      estimatedImpact: s.estimated_impact || '',
+      roiScore: s.roi_score || 0,
+    })),
+    recommendedStrategy: r.recommended_strategy || '',
+    recommendationReasoning: r.recommendation_reasoning || '',
+    drafts: {
+      pressRelease: r.press_release || '',
+      internalEmail: r.internal_email || '',
+      socialPost: r.social_post || '',
+      legalNotice: r.legal_notice_draft || '',
+    },
+    decisionSummary: r.decision_summary || '',
+  };
+}
+
 /* ─── Debug mock data: Agent 1 ─── */
 
 const MOCK_TOPICS: TopicGroup[] = [
@@ -433,6 +533,71 @@ const MOCK_PRECEDENTS: PrecedentsData = {
   confidence: 'high',
 };
 
+/* ─── Debug mock data: Agent 4 ─── */
+
+const MOCK_STRATEGY_DATA: StrategyData = {
+  alertLevel: 'MEDIUM',
+  alertReasoning: 'Moderate reach with significant churn risk warrants a proactive but measured response.',
+  recommendedAction: 'communicate',
+  strategies: [
+    {
+      name: 'Offensive',
+      description: 'Legal-focused, firm tone. Aggressively correct misinformation and pursue cease-and-desist where applicable. High cost, slower ROI but protects legal standing.',
+      tone: 'Firm & Legal',
+      channels: ['press_release', 'legal_notice', 'internal_email'],
+      keyActions: [
+        'Issue cease-and-desist to publications with factual errors',
+        'Engage external legal counsel for defamation review',
+        'Prepare formal rebuttal with documented evidence',
+        'Brief board on legal strategy and timeline',
+      ],
+      estimatedCostEur: 85000,
+      estimatedImpact: 'Reduces VaR by ~25%, high legal risk if facts are contested',
+      roiScore: 4,
+    },
+    {
+      name: 'Diplomate',
+      description: 'Empathy and transparency combined with factual corrections. Balanced cost with proactive communication to rebuild trust. Includes commercial gestures if churn risk is high.',
+      tone: 'Empathetic & Transparent',
+      channels: ['press_release', 'social_media', 'internal_email', 'stakeholder_email'],
+      keyActions: [
+        'Publish transparent statement acknowledging concerns',
+        'Launch proactive customer communication program',
+        'Offer goodwill gestures to affected customers',
+        'Host open Q&A session with leadership',
+        'Commit to weekly progress updates',
+      ],
+      estimatedCostEur: 45000,
+      estimatedImpact: 'Reduces VaR by ~55%, rebuilds trust within 2-4 weeks',
+      roiScore: 8,
+    },
+    {
+      name: 'Silence',
+      description: 'Minimize the Streisand effect by avoiding public response. Handle concerns privately through direct channels. Minimal cost but risks appearing dismissive.',
+      tone: 'Minimal & Observant',
+      channels: ['internal_email'],
+      keyActions: [
+        'Monitor media coverage without public response',
+        'Prepare holding statement for media inquiries only',
+        'Handle customer complaints through private channels',
+        'Brief internal teams on no-comment protocol',
+      ],
+      estimatedCostEur: 5000,
+      estimatedImpact: 'No immediate VaR reduction, relies on news cycle fading naturally',
+      roiScore: 5,
+    },
+  ],
+  recommendedStrategy: 'Diplomate',
+  recommendationReasoning: 'Given moderate churn risk and established media coverage, a transparent and empathetic approach maximizes ROI while minimizing legal exposure.',
+  drafts: {
+    pressRelease: 'FOR IMMEDIATE RELEASE\n\nCompany Statement Regarding Recent Concerns\n\nWe take full responsibility for this situation and are committed to complete transparency with our stakeholders, customers, and the public.\n\n"We recognize the severity of this matter and the trust our customers have placed in us," said company leadership. "We are implementing immediate corrective measures and will provide regular updates as our internal review progresses."\n\nImmediate actions being taken:\n  • Independent third-party review initiated\n  • Dedicated response team established\n  • Direct stakeholder communication program launched\n  • Regular progress updates committed to weekly cadence\n\nMedia Contact: press@company.com',
+    internalEmail: 'INTERNAL — CONFIDENTIAL\n\nTo: All Employees\nFrom: Office of the CEO\nRe: Our Path Forward\n\nTeam,\n\nI\'m writing to address the situation directly. You may have seen recent coverage, and I want you to hear it from me first.\n\nWe are taking immediate action:\n1. Full internal audit launching today\n2. External advisory board being assembled this week\n3. Every affected stakeholder will receive direct communication\n4. Weekly all-hands updates until this is fully resolved\n\nI need each of you to uphold our values in every conversation. My door is open.',
+    socialPost: 'We\'ve heard your concerns and we\'re taking action. Full transparency, immediate corrective measures, and weekly updates. Your trust matters — we intend to earn it back through action. More details: [link]',
+    legalNotice: '',
+  },
+  decisionSummary: 'With a total VaR of €45,200 and moderate media reach, this crisis warrants active management. Historical precedents show that transparent, proactive responses in similar situations recovered trust 3x faster. The Diplomate strategy offers the best ROI at 8/10, balancing cost efficiency with trust recovery speed.',
+};
+
 /** Debug mode: add ?debug to the URL to skip the backend and use mock data */
 const isDebug = typeof window !== 'undefined' && new URLSearchParams(window.location.search).has('debug');
 
@@ -489,4 +654,45 @@ export async function fetchPrecedents(companyName: string, topic: TopicGroup): P
 
   const data: PrecedentsResponse = await res.json();
   return transformPrecedents(data);
+}
+
+export async function fetchCrisisResponse(
+  companyName: string,
+  topic: TopicGroup,
+): Promise<{ strategyData: StrategyData; precedentsData: PrecedentsData }> {
+  if (isDebug) {
+    await new Promise((r) => setTimeout(r, 5000));
+    console.log(`[DEBUG MODE] Returning mock crisis response for "${topic.name}"`);
+    return { strategyData: MOCK_STRATEGY_DATA, precedentsData: MOCK_PRECEDENTS };
+  }
+
+  const res = await fetch('/api/crisis-response', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      company_name: companyName,
+      topic_name: topic.name,
+      topic_summary: topic.summary,
+      articles: topic.articles.map((a) => ({
+        title: a.title,
+        summary: a.summary,
+        subject: a.subject,
+        severity_score: a.severityScore,
+      })),
+    }),
+  });
+
+  if (!res.ok) {
+    throw new Error(`Crisis response failed: ${res.status} ${res.statusText}`);
+  }
+
+  const data: CrisisResponseResponse = await res.json();
+  return {
+    strategyData: transformStrategyReport(data),
+    precedentsData: transformPrecedents({
+      precedents: data.precedents,
+      global_lesson: data.global_lesson,
+      confidence: data.confidence,
+    }),
+  };
 }

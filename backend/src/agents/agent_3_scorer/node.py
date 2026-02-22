@@ -216,3 +216,17 @@ def scorer_node(state: GraphState) -> dict:
         "estimated_financial_loss": estimated_financial_loss,
         "severity_score": max_severity,
     }
+
+
+def scorer_from_articles(articles: list[dict]) -> dict:
+    """
+    Standalone entry point for Agent 3 — called by the REST API.
+    Mirrors scorer_node but takes a flat list of articles directly
+    (no GraphState / customer_id / crisis_id needed).
+    """
+    state: GraphState = {
+        "customer_id": "",
+        "crisis_id": "",
+        "articles": articles,
+    }
+    return scorer_node(state)

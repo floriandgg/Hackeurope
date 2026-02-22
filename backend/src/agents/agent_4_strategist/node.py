@@ -248,3 +248,42 @@ def _run_strategist(
         "drafts_generated": drafts_count,
         "agent4_api_cost_eur": round(api_cost, 4),
     }
+
+
+def strategist_from_data(
+    company_name: str,
+    articles: list[dict],
+    precedents: list[dict],
+    global_lesson: str,
+    confidence: str,
+    total_var_impact: float,
+    severity_score: int,
+) -> dict[str, Any]:
+    """
+    Standalone entry point for Agent 4 — called by the REST API.
+    Builds a minimal GraphState and delegates to _run_strategist().
+    """
+    state: GraphState = {
+        "company_name": company_name,
+        "articles": articles,
+        "precedents": precedents,
+        "global_lesson": global_lesson,
+        "confidence": confidence,
+        "total_var_impact": total_var_impact,
+        "severity_score": severity_score,
+        "customer_id": "",
+        "crisis_id": "",
+    }
+    t0 = time.time()
+    try:
+        return _run_strategist(state, "", "", t0)
+    except Exception as e:
+        elapsed = time.time() - t0
+        print(f"[AGENT 4] CRITICAL ERROR after {elapsed:.1f}s: {e}")
+        traceback.print_exc()
+        return {
+            "strategy_report": {},
+            "recommended_strategy_name": "",
+            "drafts_generated": 0,
+            "agent4_api_cost_eur": 0.0,
+        }

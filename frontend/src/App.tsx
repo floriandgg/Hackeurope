@@ -4,7 +4,7 @@ import ArticleDiscoveryPage from './components/ArticleDiscoveryPage'
 import StrategyPage from './components/StrategyPage'
 import PrecedentsPage from './components/PrecedentsPage'
 import DraftViewerPage from './components/DraftViewerPage'
-import { searchCompany, fetchPrecedents, type TopicGroup, type PrecedentsData } from './api'
+import { searchCompany, fetchCrisisResponse, type TopicGroup, type PrecedentsData, type StrategyData } from './api'
 
 export default function App() {
   const [view, setView] = useState<'landing' | 'discovery' | 'strategy' | 'precedents' | 'drafts'>('landing')
@@ -24,6 +24,11 @@ export default function App() {
   const [precedentsData, setPrecedentsData] = useState<PrecedentsData | null>(null)
   const [precedentsLoading, setPrecedentsLoading] = useState(false)
   const [precedentsError, setPrecedentsError] = useState<string | null>(null)
+
+  // Agent 4 data (strategy + drafts)
+  const [strategyData, setStrategyData] = useState<StrategyData | null>(null)
+  const [strategyLoading, setStrategyLoading] = useState(false)
+  const [strategyError, setStrategyError] = useState<string | null>(null)
 
   const handleSearch = useCallback((name: string, rect: DOMRect) => {
     setCompanyName(name)
@@ -72,18 +77,39 @@ export default function App() {
     setSelectedTopic(null)
     setPrecedentsData(null)
     setPrecedentsError(null)
+    setStrategyData(null)
+    setStrategyError(null)
   }, [])
 
   const handleRespondToTopic = useCallback((topic: TopicGroup) => {
     setSelectedTopic(topic)
     setView('strategy')
-  }, [])
+    setStrategyData(null)
+    setStrategyError(null)
+    setStrategyLoading(true)
+    setPrecedentsData(null)
+    setPrecedentsError(null)
+
+    fetchCrisisResponse(companyName, topic)
+      .then(({ strategyData: sd, precedentsData: pd }) => {
+        setStrategyData(sd)
+        setPrecedentsData(pd)
+        setStrategyLoading(false)
+      })
+      .catch((err) => {
+        console.error('Crisis response failed:', err)
+        setStrategyError(err instanceof Error ? err.message : 'Failed to generate strategy')
+        setStrategyLoading(false)
+      })
+  }, [companyName])
 
   const handleBackToDiscovery = useCallback(() => {
     setView('discovery')
     setSelectedTopic(null)
     setPrecedentsData(null)
     setPrecedentsError(null)
+    setStrategyData(null)
+    setStrategyError(null)
   }, [])
 
   const handleViewDrafts = useCallback((strategyIndex: number) => {
@@ -92,23 +118,10 @@ export default function App() {
   }, [])
 
   const handleSeeWhy = useCallback(() => {
-    if (!selectedTopic) return
-    setPrecedentsData(null)
-    setPrecedentsError(null)
-    setPrecedentsLoading(true)
+    // Precedents data is already loaded from the combined crisis-response call
+    setPrecedentsLoading(false)
     setView('precedents')
-
-    fetchPrecedents(companyName, selectedTopic)
-      .then((data) => {
-        setPrecedentsData(data)
-        setPrecedentsLoading(false)
-      })
-      .catch((err) => {
-        console.error('Precedents fetch failed:', err)
-        setPrecedentsError(err instanceof Error ? err.message : 'Failed to load precedents')
-        setPrecedentsLoading(false)
-      })
-  }, [companyName, selectedTopic])
+  }, [])
 
   const handleBackToStrategy = useCallback(() => {
     setView('strategy')
@@ -161,6 +174,9 @@ export default function App() {
         <StrategyPage
           companyName={companyName}
           topic={selectedTopic}
+          strategyData={strategyData}
+          isLoading={strategyLoading}
+          searchError={strategyError}
           onBack={handleBackToDiscovery}
           onViewDrafts={handleViewDrafts}
           onSeeWhy={handleSeeWhy}
@@ -183,6 +199,7 @@ export default function App() {
           companyName={companyName}
           topic={selectedTopic}
           strategyIndex={selectedStrategy}
+          strategyData={strategyData}
           onBack={handleBackToStrategy}
         />
       )}

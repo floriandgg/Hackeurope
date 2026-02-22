@@ -29,7 +29,7 @@ Backend (run from `backend/`):
 
 - **Frontend:** `frontend/src/` — React/Vite SPA. The article discovery page is integrated with the backend via REST; other pages still use mock data.
 - **Backend:** `backend/` — Python + LangGraph, 5 agents (Watcher, Precedents, Scorer, Strategist, CFO). See `backend/README.md` for orchestration.
-- **API integration:** `frontend/src/api.ts` calls `POST /api/search` and `POST /api/precedents` on the backend (`backend/src/server.py`). Vite dev proxy forwards `/api` to `http://localhost:8000`.
+- **API integration:** `frontend/src/api.ts` calls `POST /api/search`, `POST /api/precedents`, and `POST /api/crisis-response` on the backend (`backend/src/server.py`). Vite dev proxy forwards `/api` to `http://localhost:8000`.
 
 ### Backend: Agent 1 (The Watcher)
 
@@ -54,6 +54,30 @@ Backend (run from `backend/`):
 
 **API endpoint:** `POST /api/precedents` accepts `{ company_name, topic_name, topic_summary, articles[] }` and returns `{ precedents[], global_lesson, confidence }`.
 
+### Backend: Agent 3 (The Scorer)
+
+`backend/src/agents/agent_3_scorer/node.py` — Enriches articles with financial risk metrics using Gemini. Calculates estimated reach, churn probability, and value-at-risk (VaR) per article.
+
+**Two entry points:**
+- `scorer_node(state: GraphState)` — used in the LangGraph pipeline
+- `scorer_from_articles(articles: list[dict])` — standalone function called by the REST API
+
+**Output:** `{ articles (enriched with VaR/reach/churn), total_var_impact, severity_score }`.
+
+### Backend: Agent 4 (The Strategist)
+
+`backend/src/agents/agent_4_strategist/node.py` — Generates crisis response strategies with ROI analysis and communication drafts using Gemini. Takes enriched articles (from Agent 3), historical precedents (from Agent 2), and financial metrics to produce 3 named strategies (Offensive, Diplomate, Silence).
+
+**Two entry points:**
+- `strategist_node(state: GraphState)` — used in the LangGraph pipeline (via `_run_strategist()`)
+- `strategist_from_data(company_name, articles, precedents, global_lesson, confidence, total_var_impact, severity_score)` — standalone function called by the REST API
+
+**`CrisisStrategy` fields** (`backend/src/shared/types.py`): `name`, `description`, `tone`, `channels`, `key_actions`, `estimated_cost_eur`, `estimated_impact`, `roi_score`.
+
+**`Agent4Output` fields:** `alert_level` (IGNORE/SOFT/MEDIUM/CRITICAL), `alert_reasoning`, `recommended_action`, `strategies[]`, `recommended_strategy`, `recommendation_reasoning`, `press_release`, `internal_email`, `social_post`, `legal_notice_draft`, `decision_summary`.
+
+**Combined API endpoint:** `POST /api/crisis-response` accepts `{ company_name, topic_name, topic_summary, articles[] }` and orchestrates Agent 3 → Agent 2 → Agent 4 sequentially. Returns `{ strategy_report, recommended_strategy_name, precedents[], global_lesson, confidence }`.
+
 ### Frontend–Backend data transformation
 
 **Agent 1:** `frontend/src/api.ts` transforms backend subjects into frontend `TopicGroup[]`:
@@ -71,28 +95,37 @@ Backend (run from `backend/`):
 - `outcome` text → `outcomeLabel`
 - Single `source_url` → 1-element `articles[]` array with publisher extracted from URL
 
-**Debug mode:** Add `?debug` to the frontend URL (e.g. `http://localhost:5173/?debug`) to bypass the backend and use mock data. Agent 1 mock delay: 2.5s, Agent 2 mock delay: 4s. Defined in `api.ts`.
+**Agent 4:** `transformStrategyReport()` maps backend `Agent4Output` → frontend `StrategyData`:
+- `strategies[]` → `FrontendStrategy[]` (name, description, tone, channels, keyActions, estimatedCostEur, estimatedImpact, roiScore)
+- `recommended_strategy` → `recommendedStrategy`
+- `press_release`, `internal_email`, `social_post`, `legal_notice_draft` → `drafts` object
+- Defensive guards: throws if `strategy_report` or `strategies` is empty/undefined
+- `fetchCrisisResponse()` returns both `strategyData` and `precedentsData` from the single combined endpoint
+
+**Debug mode:** Add `?debug` to the frontend URL (e.g. `http://localhost:5173/?debug`) to bypass the backend and use mock data. Agent 1 mock delay: 2.5s, Agent 2+3+4 combined mock delay: 5s. Defined in `api.ts`.
 
 ### Frontend pages
 
 **User flow:** Landing page (company name input) → bubble transition → article discovery page (agent timeline + topic cards) → user picks a topic → expanded view with articles → "Respond to Topic" → strategy page (3 response strategies) → "See Why" → precedents page (historical case timeline) / "View Drafts" → draft viewer page (channel-specific response drafts + tone analysis).
 
-**App.tsx:** Manages view state (`landing` | `discovery` | `strategy` | `precedents` | `drafts`) and a FLIP-style bubble transition between landing and discovery. On search submit, fires `searchCompany()` API call alongside the transition. Stores `topicGroups`, `isLoading`, `searchError` state (Agent 1) and `precedentsData`, `precedentsLoading`, `precedentsError` state (Agent 2). `selectedTopic` is a full `TopicGroup` (not just name/summary) so Agent 2 can access the topic's articles. `onRespondToTopic` from the discovery page passes the full `TopicGroup` and navigates to strategy. `onSeeWhy` triggers `fetchPrecedents()` and navigates to precedents. `onViewDrafts` navigates to drafts with strategy index. `onBack` from precedents or drafts returns to strategy.
+**App.tsx:** Manages view state (`landing` | `discovery` | `strategy` | `precedents` | `drafts`) and a FLIP-style bubble transition between landing and discovery. On search submit, fires `searchCompany()` API call alongside the transition. Stores `topicGroups`, `isLoading`, `searchError` state (Agent 1), `precedentsData`, `precedentsLoading`, `precedentsError` state (Agent 2), and `strategyData`, `strategyLoading`, `strategyError` state (Agent 4). `selectedTopic` is a full `TopicGroup` (not just name/summary) so downstream agents can access the topic's articles. `onRespondToTopic` calls `fetchCrisisResponse()` which runs Agent 3+2+4 via the combined `/api/crisis-response` endpoint — sets both `strategyData` and `precedentsData` from one response. `onSeeWhy` just navigates to precedents (data already loaded, no separate API call). `onViewDrafts` navigates to drafts with strategy index. `onBack` from precedents or drafts returns to strategy.
 
 **Landing page** (`LandingPage.tsx`): Hero with textarea input, project showcase cards at the bottom with 3D tilt-on-hover effect (`TiltCard` component). Two Spline-ready containers are in place (background scene at `z-[1]` and a secondary slot between input and cards) for adding 3D models later. Desktop uses a fanned card layout; mobile uses a horizontal scroll.
 
 **Article discovery page** (`ArticleDiscoveryPage.tsx`): Split-view layout — left sidebar shows an animated agent activity timeline (6 steps with progressive delays ~1s→20s while loading, final step completes when data arrives), right panel displays topic cards in an overlapping stack. Topics fan out on hover. Clicking a topic triggers a FLIP card-expand animation into a detail view showing urgency score, summary, a "Respond to Topic" button, and a stacked row of individual article cards. Article cards are clickable `<a>` links that open the source URL in a new tab. Data comes from Agent 1 via `topicGroups` prop (variable number of groups, 1–5). Articles have criticality scores (1–10) with color-coded badges (red ≥8, amber ≥5, gray below). Error and empty states handled. The "Respond to Topic" button calls `onRespondToTopic` with the full `TopicGroup` object.
 
-**Strategy page** (`StrategyPage.tsx`): Displays 3 predefined response strategies — "Own It" (green, low risk), "Reframe" (amber, medium risk), "Hold the Line" (red, very high risk). Each card shows description, risk level, trust recovery speed, and best-for scenario. "Own It" is marked as recommended. Cards have tilt-on-hover effect. A "View Drafts →" button on each card calls `onViewDrafts(strategyIndex)` to navigate to the drafts page. A "See Why" button below the cards navigates to the precedents page via `onSeeWhy`.
+**Strategy page** (`StrategyPage.tsx`): **Integrated with Agent 3+4 (real data).** Split-view layout matching the article discovery and precedents pages. Left sidebar shows an animated agent activity timeline (6 steps: steps 1-2 = Agent 3 financial scoring, steps 3-4 = Agent 2 precedent search, steps 5-6 = Agent 4 strategy generation). Right panel displays dynamic strategy cards from `strategyData.strategies` (typically 3: Offensive/red, Diplomate/green, Silence/gray). Each card shows description (line-clamped), tone badge, cost + ROI metrics, key actions (max 3 shown with "+N more"), estimated impact, and a "View Drafts" button. Recommended strategy gets a badge. Alert level badge at top (CRITICAL/MEDIUM/SOFT/IGNORE with color coding). Decision summary card and "See Why" button below cards. Two-useEffect loading pattern. `StrategyTiltCard` uses inline `perspective(800px)` in the transform string (not `transformStyle: preserve-3d`) to avoid 3D stacking context issues with `overflow-y-auto` hit-testing. Props: `companyName`, `topic`, `strategyData`, `isLoading`, `searchError`, `onBack`, `onViewDrafts`, `onSeeWhy`.
 
 **Precedents page** (`PrecedentsPage.tsx`): **Integrated with Agent 2 (real data).** Split-view layout matching the article discovery page — left sidebar shows an animated agent activity timeline (6 steps with progressive delays ~1s→28s while loading, final step completes when data arrives), right panel displays a vertical timeline of historical precedent cases. Each case card shows company/year, crisis description, type badge, strategy used, outcome badge (green "Recovered" / red "Damaged" with outcome detail), a blockquote-style lesson, and clickable article cards (when source URL exists). Props: `precedentsData`, `isLoading`, `searchError` from App.tsx. Two-useEffect loading pattern: Effect 1 animates steps 0–4 while loading; Effect 2 completes step 5, stagger-reveals cases, and shows summary card when data arrives. Dynamic case count (not hardcoded). Summary card shows confidence level + case count. "Key Insight" card displays `globalLesson` from Agent 2. Error and empty states with back buttons.
 
-**Draft viewer page** (`DraftViewerPage.tsx`): Accessible via "View Drafts" on the strategy page. Shows an interactive horizontal crisis timeline at the top (5 nodes: Crisis Detected → Analysis → Strategy → Drafts Ready → Distribution). Below the timeline, horizontal channel tabs (Press Release, Twitter/X, Internal Memo, Stakeholder Email, Media Q&A) sit above a draft text viewer that displays strategy-aware mock content — each of the 3 strategies generates different tone/content for all 5 channels. A full-width tone analysis panel at the bottom shows 5 sentiment metrics (Empathy, Accountability, Authority, Urgency, Reassurance) as animated progress bars color-coded by intensity. Props: `companyName`, `topic`, `strategyIndex`, `onBack`.
+**Draft viewer page** (`DraftViewerPage.tsx`): **Integrated with Agent 4 (real data).** Accessible via "View Drafts" on the strategy page. Shows an interactive horizontal crisis timeline at the top (4 nodes: NOW → +1h → +4h → +24h). Below the timeline, horizontal channel tabs (Press Release, Internal Email, Social Post, Legal Notice — 4 channels matching Agent 4 output) sit above a draft text viewer that displays AI-generated content from `strategyData.drafts`. Legal Notice tab shows "Not applicable at this alert level" when empty (non-CRITICAL alerts). Strategy name and color in header derived from `strategyData`. A full-width tone analysis panel at the bottom shows 5 sentiment metrics (Empathy, Urgency, Authority, Deflection, Legal Risk) as animated progress bars — these remain mock data (Agent 4 doesn't produce tone metrics). Reading level grades also mock. Props: `companyName`, `topic`, `strategyIndex`, `strategyData`, `onBack`.
 
 **Integration status:**
 - Landing → Discovery: **integrated** with Agent 1 (real data)
-- Discovery → Strategy → Precedents: **integrated** with Agent 2 (real data)
-- Strategy, Drafts pages: **still mock data** — ready for Agents 3, 4 integration
+- Discovery → Strategy: **integrated** with Agent 3 + Agent 4 (real data via combined `/api/crisis-response` endpoint)
+- Strategy → Precedents: **integrated** with Agent 2 (real data, loaded alongside strategy from same endpoint)
+- Strategy → Drafts: **integrated** with Agent 4 (real AI-generated drafts); tone analysis metrics remain mock
+- Mock data still used for: tone analysis bars, reading level grades, crisis timeline node descriptions
 
 **Pipeline phases (remaining, not yet built):**
 1. CrisisBrief — initial crisis analysis
