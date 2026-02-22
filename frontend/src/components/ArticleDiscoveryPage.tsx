@@ -74,10 +74,13 @@ function ArticleCardsStack({ articles }: { articles: Article[] }) {
             }}
             onMouseEnter={() => setHoveredCard(i)}
           >
-            <div
-              className="w-[195px] h-[195px] rounded-xl border p-4 cursor-pointer select-none flex flex-col transition-all duration-300"
+            <a
+              href={article.url}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="w-[195px] h-[195px] rounded-xl border p-4 cursor-pointer select-none flex flex-col transition-all duration-300 no-underline"
               style={{
-                backgroundColor: isHovered ? '#ffffff' : '#ffffff',
+                backgroundColor: '#ffffff',
                 borderColor: isHovered
                   ? 'rgba(43,58,143,0.15)'
                   : '#e8eaf0',
@@ -108,7 +111,7 @@ function ArticleCardsStack({ articles }: { articles: Article[] }) {
               <span className="text-[10px] text-silver mt-2 shrink-0">
                 {article.date}
               </span>
-            </div>
+            </a>
           </div>
         );
       })}

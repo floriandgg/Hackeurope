@@ -46,6 +46,9 @@ Backend (run from `backend/`):
 - Publisher extracted from article URL domain (25+ known mappings)
 - `exposure_score` → `criticality` (1–10) via log normalization: `clamp(1, round(2.2 × ln(score)), 10)`
 - `pub_date` ISO string → formatted date ("Feb 19, 2026")
+- `url` passed through for clickable article links
+
+**Debug mode:** Add `?debug` to the frontend URL (e.g. `http://localhost:5173/?debug`) to bypass the backend and use mock data with a 2.5s simulated delay. Defined in `api.ts`.
 
 ### Frontend pages
 
@@ -55,7 +58,7 @@ Backend (run from `backend/`):
 
 **Landing page** (`LandingPage.tsx`): Hero with textarea input, project showcase cards at the bottom with 3D tilt-on-hover effect (`TiltCard` component). Two Spline-ready containers are in place (background scene at `z-[1]` and a secondary slot between input and cards) for adding 3D models later. Desktop uses a fanned card layout; mobile uses a horizontal scroll.
 
-**Article discovery page** (`ArticleDiscoveryPage.tsx`): Split-view layout — left sidebar shows an animated agent activity timeline (6 steps with progressive delays ~1s→20s while loading, final step completes when data arrives), right panel displays topic cards in an overlapping stack. Topics fan out on hover. Clicking a topic triggers a FLIP card-expand animation into a detail view showing urgency score, summary, a "Respond to Topic" button, and a stacked row of individual article cards. Data comes from Agent 1 via `topicGroups` prop (variable number of groups, 1–5). Articles have criticality scores (1–10) with color-coded badges (red ≥8, amber ≥5, gray below). Error and empty states handled. The "Respond to Topic" button calls `onRespondToTopic` with the topic's name and summary.
+**Article discovery page** (`ArticleDiscoveryPage.tsx`): Split-view layout — left sidebar shows an animated agent activity timeline (6 steps with progressive delays ~1s→20s while loading, final step completes when data arrives), right panel displays topic cards in an overlapping stack. Topics fan out on hover. Clicking a topic triggers a FLIP card-expand animation into a detail view showing urgency score, summary, a "Respond to Topic" button, and a stacked row of individual article cards. Article cards are clickable `<a>` links that open the source URL in a new tab. Data comes from Agent 1 via `topicGroups` prop (variable number of groups, 1–5). Articles have criticality scores (1–10) with color-coded badges (red ≥8, amber ≥5, gray below). Error and empty states handled. The "Respond to Topic" button calls `onRespondToTopic` with the topic's name and summary.
 
 **Strategy page** (`StrategyPage.tsx`): Displays 3 predefined response strategies — "Own It" (green, low risk), "Reframe" (amber, medium risk), "Hold the Line" (red, very high risk). Each card shows description, risk level, trust recovery speed, and best-for scenario. "Own It" is marked as recommended. Cards have tilt-on-hover effect. A "View Drafts →" button on each card calls `onViewDrafts(strategyIndex)` to navigate to the drafts page. A "See Why" button below the cards navigates to the precedents page via `onSeeWhy`.
 
