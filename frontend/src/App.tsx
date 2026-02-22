@@ -1,10 +1,17 @@
 import { useState, useEffect, useCallback } from 'react'
 import LandingPage from './components/LandingPage'
 import ArticleDiscoveryPage from './components/ArticleDiscoveryPage'
+import StrategyPage from './components/StrategyPage'
+
+interface TopicInfo {
+  name: string;
+  summary: string;
+}
 
 export default function App() {
-  const [view, setView] = useState<'landing' | 'discovery'>('landing')
+  const [view, setView] = useState<'landing' | 'discovery' | 'strategy'>('landing')
   const [companyName, setCompanyName] = useState('')
+  const [selectedTopic, setSelectedTopic] = useState<TopicInfo | null>(null)
   const [isTransitioning, setIsTransitioning] = useState(false)
   const [inputRect, setInputRect] = useState<DOMRect | null>(null)
   const [bubbleExpanded, setBubbleExpanded] = useState(false)
@@ -38,6 +45,21 @@ export default function App() {
   const handleBack = useCallback(() => {
     setView('landing')
     setCompanyName('')
+    setSelectedTopic(null)
+  }, [])
+
+  const handleRespondToTopic = useCallback((topic: TopicInfo) => {
+    setSelectedTopic(topic)
+    setView('strategy')
+  }, [])
+
+  const handleBackToDiscovery = useCallback(() => {
+    setView('discovery')
+    setSelectedTopic(null)
+  }, [])
+
+  const handleViewDrafts = useCallback((_strategyIndex: number) => {
+    // Future: navigate to DraftViewer phase
   }, [])
 
   return (
@@ -73,7 +95,20 @@ export default function App() {
       )}
 
       {view === 'discovery' && (
-        <ArticleDiscoveryPage companyName={companyName} onBack={handleBack} />
+        <ArticleDiscoveryPage
+          companyName={companyName}
+          onBack={handleBack}
+          onRespondToTopic={handleRespondToTopic}
+        />
+      )}
+
+      {view === 'strategy' && selectedTopic && (
+        <StrategyPage
+          companyName={companyName}
+          topic={selectedTopic}
+          onBack={handleBackToDiscovery}
+          onViewDrafts={handleViewDrafts}
+        />
       )}
     </>
   )

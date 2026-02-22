@@ -355,11 +355,13 @@ function TopicCardsStack({
 interface ArticleDiscoveryPageProps {
   companyName: string;
   onBack: () => void;
+  onRespondToTopic: (topic: { name: string; summary: string }) => void;
 }
 
 export default function ArticleDiscoveryPage({
   companyName,
   onBack,
+  onRespondToTopic,
 }: ArticleDiscoveryPageProps) {
   const [completedSteps, setCompletedSteps] = useState(0);
   const [activeStep, setActiveStep] = useState(0);
@@ -730,6 +732,7 @@ export default function ArticleDiscoveryPage({
                       <ExpandedContent
                         topic={TOPIC_GROUPS[selectedTopic]}
                         onBack={handleCollapse}
+                        onRespond={onRespondToTopic}
                       />
                     )}
                   </div>
@@ -748,9 +751,11 @@ export default function ArticleDiscoveryPage({
 function ExpandedContent({
   topic,
   onBack,
+  onRespond,
 }: {
   topic: TopicGroup;
   onBack: () => void;
+  onRespond: (topic: { name: string; summary: string }) => void;
 }) {
   const urgency = Math.max(...topic.articles.map((a) => a.criticality));
   const urgencyStyle = getCriticalityStyle(urgency);
@@ -794,6 +799,7 @@ function ExpandedContent({
 
         {/* Respond to topic button */}
         <button
+          onClick={() => onRespond({ name: topic.name, summary: topic.summary })}
           className="inline-flex items-center gap-2 px-6 py-2.5 rounded-full
                      bg-royal text-white text-sm font-body font-medium
                      hover:bg-royal/90
