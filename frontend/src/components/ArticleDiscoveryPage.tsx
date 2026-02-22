@@ -1,20 +1,7 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
+import type { TopicGroup, Article } from '../api';
 
-/* ─── Types ─── */
-
-interface Article {
-  publisher: string;
-  date: string;
-  title: string;
-  summary: string;
-  criticality: number;
-}
-
-interface TopicGroup {
-  name: string;
-  summary: string;
-  articles: Article[];
-}
+export type { TopicGroup, Article };
 
 interface ExpandRect {
   top: number;
@@ -27,119 +14,15 @@ interface ExpandRect {
 
 type ExpandPhase = 'idle' | 'start' | 'expanded' | 'collapsing';
 
-/* ─── Mock Data ─── */
+/* ─── Agent Timeline Steps (cosmetic) ─── */
 
 const AGENT_STEPS = [
-  { label: 'Initializing search agents', detail: 'Deploying 3 specialized crawlers' },
-  { label: 'Scanning news databases', detail: 'Querying Reuters, Bloomberg, AP, and 12 more sources' },
-  { label: 'Analyzing sentiment patterns', detail: 'NLP processing across 847 candidate articles' },
-  { label: 'Cross-referencing sources', detail: 'Validating claims across 6 independent outlets' },
+  { label: 'Initializing search agents', detail: 'Deploying specialized crawlers' },
+  { label: 'Scanning news databases', detail: 'Querying Reuters, Bloomberg, AP, and more' },
+  { label: 'Analyzing sentiment patterns', detail: 'NLP processing across candidate articles' },
+  { label: 'Cross-referencing sources', detail: 'Validating claims across independent outlets' },
   { label: 'Evaluating criticality scores', detail: 'Weighted scoring by reach, severity, and recency' },
-  { label: 'Compiling final results', detail: '10 most critical articles selected' },
-];
-
-const TOPIC_GROUPS: TopicGroup[] = [
-  {
-    name: 'Data & Privacy',
-    summary:
-      'Multiple data protection failures and security vulnerabilities detected across business divisions.',
-    articles: [
-      {
-        publisher: 'Reuters',
-        date: 'Feb 19, 2026',
-        title: 'Data Privacy Concerns Mount After Internal Audit Leak',
-        summary:
-          'Leaked audit documents reveal systemic data protection failures across multiple divisions.',
-        criticality: 9,
-      },
-      {
-        publisher: 'TechCrunch',
-        date: 'Feb 16, 2026',
-        title: 'Product Safety Report Flags Critical Vulnerabilities',
-        summary:
-          'Independent researchers identify multiple unpatched vulnerabilities in flagship product.',
-        criticality: 8,
-      },
-      {
-        publisher: 'Wired',
-        date: 'Feb 12, 2026',
-        title: 'AI Ethics Board Resignations Signal Internal Discord',
-        summary:
-          'Three board members step down over disagreements about AI deployment policies.',
-        criticality: 6,
-      },
-    ],
-  },
-  {
-    name: 'Financial & Governance',
-    summary:
-      'Regulatory scrutiny, leadership instability, and declining financial performance raise investor concerns.',
-    articles: [
-      {
-        publisher: 'Financial Times',
-        date: 'Feb 18, 2026',
-        title: 'Regulatory Investigation Launched Over Market Practices',
-        summary:
-          'Federal regulators open inquiry into potentially anticompetitive business practices.',
-        criticality: 9,
-      },
-      {
-        publisher: 'The Wall Street Journal',
-        date: 'Feb 17, 2026',
-        title: 'Executive Leadership Shakeup Raises Governance Questions',
-        summary:
-          'Departure of two C-suite executives prompts investor concerns about stability.',
-        criticality: 8,
-      },
-      {
-        publisher: 'Bloomberg',
-        date: 'Feb 15, 2026',
-        title: 'Quarterly Earnings Fall Short of Projections',
-        summary:
-          'Revenue missed consensus by 12%, marking the third disappointing quarter.',
-        criticality: 7,
-      },
-      {
-        publisher: 'Associated Press',
-        date: 'Feb 14, 2026',
-        title: 'Employee Whistleblower Alleges Safety Issues',
-        summary:
-          'Former employee files complaint citing OSHA violations and management negligence.',
-        criticality: 7,
-      },
-    ],
-  },
-  {
-    name: 'Operations & Reputation',
-    summary:
-      'Supply chain disruptions and consumer backlash threaten brand reputation and operational continuity.',
-    articles: [
-      {
-        publisher: 'The Guardian',
-        date: 'Feb 13, 2026',
-        title: 'Environmental Compliance Violations Surface in Report',
-        summary:
-          'Investigation documents repeated violations at three manufacturing facilities.',
-        criticality: 6,
-      },
-      {
-        publisher: 'CNBC',
-        date: 'Feb 11, 2026',
-        title: 'Supply Chain Disruptions Threaten Product Launch',
-        summary:
-          'Key supplier bankruptcy creates uncertainty for product availability.',
-        criticality: 5,
-      },
-      {
-        publisher: 'The New York Times',
-        date: 'Feb 10, 2026',
-        title: 'Consumer Backlash Over Pricing Changes',
-        summary:
-          'Petition with 200K signatures demands reversal of recent price increases.',
-        criticality: 5,
-      },
-    ],
-  },
+  { label: 'Compiling final results', detail: 'Most critical articles selected' },
 ];
 
 /* ─── Helpers ─── */
@@ -236,11 +119,13 @@ function ArticleCardsStack({ articles }: { articles: Article[] }) {
 /* ─── Topic Cards Stack ─── */
 
 function TopicCardsStack({
+  topicGroups,
   visibleTopics,
   hidden,
   onSelectTopic,
   cardRefs,
 }: {
+  topicGroups: TopicGroup[];
   visibleTopics: number;
   hidden: boolean;
   onSelectTopic: (index: number) => void;
@@ -260,7 +145,7 @@ function TopicCardsStack({
       }}
       onMouseLeave={() => setHoveredCard(null)}
     >
-      {TOPIC_GROUPS.map((topic, i) => {
+      {topicGroups.map((topic, i) => {
         const isHovered = hoveredCard === i;
         const visible = i < visibleTopics;
         const urgency = Math.max(...topic.articles.map((a) => a.criticality));
@@ -354,12 +239,18 @@ function TopicCardsStack({
 
 interface ArticleDiscoveryPageProps {
   companyName: string;
+  topicGroups: TopicGroup[];
+  isLoading: boolean;
+  searchError: string | null;
   onBack: () => void;
   onRespondToTopic: (topic: { name: string; summary: string }) => void;
 }
 
 export default function ArticleDiscoveryPage({
   companyName,
+  topicGroups,
+  isLoading,
+  searchError,
   onBack,
   onRespondToTopic,
 }: ArticleDiscoveryPageProps) {
@@ -374,29 +265,50 @@ export default function ArticleDiscoveryPage({
   const cardRefs = useRef<(HTMLDivElement | null)[]>([]);
   const contentAreaRef = useRef<HTMLDivElement>(null);
 
+  // Animate agent steps while loading — progressive delays so the timeline
+  // doesn't finish long before the API returns (typically 15–40s).
   useEffect(() => {
     const timers: ReturnType<typeof setTimeout>[] = [];
 
-    AGENT_STEPS.forEach((_, i) => {
-      timers.push(setTimeout(() => setActiveStep(i), i * 650 + 300));
-      timers.push(
-        setTimeout(() => setCompletedSteps(i + 1), (i + 1) * 650 + 100),
-      );
-    });
-
-    timers.push(setTimeout(() => setVisibleTopics(1), 2000));
-    timers.push(setTimeout(() => setVisibleTopics(2), 2700));
-    timers.push(setTimeout(() => setVisibleTopics(3), 3400));
-
-    timers.push(
-      setTimeout(
-        () => setShowSummary(true),
-        AGENT_STEPS.length * 650 + 400,
-      ),
-    );
+    if (isLoading) {
+      const stepsToAnimate = AGENT_STEPS.length - 1; // hold the last step for data arrival
+      // Progressive delays: 1s, 3.5s, 7.5s, 13s, 20s — later steps feel heavier
+      const cumulativeDelays = [1000, 3500, 7500, 13000, 20000];
+      for (let i = 0; i < stepsToAnimate; i++) {
+        const delay = cumulativeDelays[i] ?? (i + 1) * 4000;
+        timers.push(setTimeout(() => setActiveStep(i), delay));
+        timers.push(setTimeout(() => setCompletedSteps(i + 1), delay + 600));
+      }
+    }
 
     return () => timers.forEach(clearTimeout);
-  }, []);
+  }, [isLoading]);
+
+  // When data arrives, complete the last step and reveal topics
+  useEffect(() => {
+    if (!isLoading && topicGroups.length > 0) {
+      const timers: ReturnType<typeof setTimeout>[] = [];
+
+      // Complete final agent step
+      timers.push(setTimeout(() => setActiveStep(AGENT_STEPS.length - 1), 100));
+      timers.push(setTimeout(() => setCompletedSteps(AGENT_STEPS.length), 400));
+
+      // Reveal topic cards with stagger
+      topicGroups.forEach((_, i) => {
+        timers.push(setTimeout(() => setVisibleTopics(i + 1), 600 + i * 500));
+      });
+
+      // Show summary after all topics revealed
+      timers.push(
+        setTimeout(
+          () => setShowSummary(true),
+          600 + topicGroups.length * 500 + 300,
+        ),
+      );
+
+      return () => timers.forEach(clearTimeout);
+    }
+  }, [isLoading, topicGroups]);
 
   /* ─ FLIP expansion: measure card → set start → expand ─ */
 
@@ -436,7 +348,7 @@ export default function ArticleDiscoveryPage({
     }, 560);
   }, []);
 
-  const totalArticles = TOPIC_GROUPS.reduce(
+  const totalArticles = topicGroups.reduce(
     (sum, g) => sum + g.articles.length,
     0,
   );
@@ -606,9 +518,9 @@ export default function ArticleDiscoveryPage({
                   </div>
                   <div className="grid grid-cols-2 gap-3">
                     <div>
-                      <p className="text-2xl font-display text-royal">847</p>
+                      <p className="text-2xl font-display text-royal">{topicGroups.length}</p>
                       <p className="text-[10px] text-storm mt-0.5">
-                        Articles Scanned
+                        Topics Found
                       </p>
                     </div>
                     <div>
@@ -651,8 +563,9 @@ export default function ArticleDiscoveryPage({
                 Negative Coverage
               </h2>
               <p className="text-sm text-storm">
-                {totalArticles} articles across {TOPIC_GROUPS.length} crisis
-                topics
+                {isLoading
+                  ? 'Agents are analyzing articles…'
+                  : `${totalArticles} articles across ${topicGroups.length} crisis topics`}
               </p>
             </div>
 
@@ -689,8 +602,36 @@ export default function ArticleDiscoveryPage({
                 </div>
               )}
 
+              {/* Error state */}
+              {searchError && (
+                <div className="flex flex-col items-center justify-center gap-3 text-sm pt-8">
+                  <p className="text-red-600 font-medium">Something went wrong</p>
+                  <p className="text-storm">{searchError}</p>
+                  <button
+                    onClick={onBack}
+                    className="mt-2 px-5 py-2 rounded-full border border-silver/30 text-storm text-sm hover:text-charcoal transition-colors"
+                  >
+                    Try Again
+                  </button>
+                </div>
+              )}
+
+              {/* Empty state (no results, not loading) */}
+              {!isLoading && !searchError && topicGroups.length === 0 && (
+                <div className="flex flex-col items-center justify-center gap-3 text-sm text-storm pt-8">
+                  <p>No negative coverage found for this company.</p>
+                  <button
+                    onClick={onBack}
+                    className="mt-2 px-5 py-2 rounded-full border border-silver/30 text-storm text-sm hover:text-charcoal transition-colors"
+                  >
+                    Try Another Company
+                  </button>
+                </div>
+              )}
+
               {/* Topic cards stack */}
               <TopicCardsStack
+                topicGroups={topicGroups}
                 visibleTopics={visibleTopics}
                 hidden={!showTopics}
                 onSelectTopic={handleSelectTopic}
@@ -728,9 +669,9 @@ export default function ArticleDiscoveryPage({
                         : 'opacity 0.12s ease-out',
                     }}
                   >
-                    {selectedTopic !== null && (
+                    {selectedTopic !== null && topicGroups[selectedTopic] && (
                       <ExpandedContent
-                        topic={TOPIC_GROUPS[selectedTopic]}
+                        topic={topicGroups[selectedTopic]}
                         onBack={handleCollapse}
                         onRespond={onRespondToTopic}
                       />

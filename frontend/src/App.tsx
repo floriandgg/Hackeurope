@@ -4,6 +4,7 @@ import ArticleDiscoveryPage from './components/ArticleDiscoveryPage'
 import StrategyPage from './components/StrategyPage'
 import PrecedentsPage from './components/PrecedentsPage'
 import DraftViewerPage from './components/DraftViewerPage'
+import { searchCompany, type TopicGroup } from './api'
 
 interface TopicInfo {
   name: string;
@@ -19,10 +20,30 @@ export default function App() {
   const [inputRect, setInputRect] = useState<DOMRect | null>(null)
   const [bubbleExpanded, setBubbleExpanded] = useState(false)
 
+  // Agent 1 data
+  const [topicGroups, setTopicGroups] = useState<TopicGroup[]>([])
+  const [isLoading, setIsLoading] = useState(false)
+  const [searchError, setSearchError] = useState<string | null>(null)
+
   const handleSearch = useCallback((name: string, rect: DOMRect) => {
     setCompanyName(name)
     setInputRect(rect)
     setIsTransitioning(true)
+    setTopicGroups([])
+    setSearchError(null)
+    setIsLoading(true)
+
+    // Fire the API call alongside the bubble transition
+    searchCompany(name)
+      .then((groups) => {
+        setTopicGroups(groups)
+        setIsLoading(false)
+      })
+      .catch((err) => {
+        console.error('Search failed:', err)
+        setSearchError(err instanceof Error ? err.message : 'Search failed')
+        setIsLoading(false)
+      })
   }, [])
 
   useEffect(() => {
@@ -109,6 +130,9 @@ export default function App() {
       {view === 'discovery' && (
         <ArticleDiscoveryPage
           companyName={companyName}
+          topicGroups={topicGroups}
+          isLoading={isLoading}
+          searchError={searchError}
           onBack={handleBack}
           onRespondToTopic={handleRespondToTopic}
         />
