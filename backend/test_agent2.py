@@ -29,7 +29,8 @@ def main():
 
     # --- Agent 1 ---
     print("\n[TEST] Starting Agent 1 (The Watcher)...\n")
-    state = watcher_node({"company_name": company})
+    initial_state = {"company_name": company}
+    state = {**initial_state, **watcher_node(initial_state)}
     articles = state.get("articles", [])
     print(f"\n[TEST] Agent 1 done -- {len(articles)} articles found.")
 

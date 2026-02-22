@@ -27,6 +27,8 @@ class GraphState(TypedDict, total=False):
     # Agent 2
     precedents: list[dict[str, Any]]
     global_lesson: str
+    confidence: str  # "high", "medium", or "low" — how much to trust the precedents
+    agent2_sources: list[dict[str, Any]]  # {url, title, phase} — sources found via Google Search grounding
 
     # Agent 3 — enriches each article with reach_estimate, churn_risk_percent, value_at_risk
     total_var_impact: float  # sum of VaR for all articles
