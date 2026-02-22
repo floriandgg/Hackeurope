@@ -307,7 +307,7 @@ export default function StrategyPage({
 
     if (isLoading) {
       const stepsToAnimate = STRATEGY_AGENT_STEPS.length - 1;
-      const cumulativeDelays = [1000, 5000, 12000, 22000, 35000];
+      const cumulativeDelays = [3000, 8000, 14000, 21000, 29000];
       for (let i = 0; i < stepsToAnimate; i++) {
         const delay = cumulativeDelays[i] ?? (i + 1) * 7000;
         timers.push(setTimeout(() => setActiveStep(i), delay));
