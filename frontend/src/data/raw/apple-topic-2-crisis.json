@@ -1,0 +1,134 @@
+{
+  "strategy_report": {
+    "alert_level": "IGNORE",
+    "alert_reasoning": "The financial risk (VaR €5,940) is negligible for a company of Apple's scale, and the severity score is minimal (1/5). The article is standard, speculative tech journalism, and the high churn risk appears to be a data anomaly based on a misclassification, making this a non-event.",
+    "recommended_action": "monitor_only",
+    "strategies": [
+      {
+        "name": "Offensive",
+        "description": "This strategy involves aggressively and unnecessarily confronting a media outlet for routine speculation. It would create a crisis from a non-event, damage media relations, and generate significant negative attention.",
+        "tone": "Firm & Legal",
+        "channels": [
+          "legal_notice",
+          "press_release"
+        ],
+        "key_actions": [
+          "Draft and send a cease-and-desist letter to MacRumors regarding speculative content.",
+          "Issue a formal press release to 'correct the record' on a non-existent issue.",
+          "Demand a retraction or clarification from the publication.",
+          "Place the outlet on a communications blacklist for future events."
+        ],
+        "estimated_cost_eur": 50000.0,
+        "estimated_impact": "Creates a major crisis from nothing, causing significant brand damage and a spike in VaR. High risk of Streisand effect.",
+        "roi_score": 1
+      },
+      {
+        "name": "Diplomate",
+        "description": "A diplomatic approach would involve acknowledging the speculation and attempting to control the narrative. This is still an overreaction that lends undue credibility to a routine rumor article and consumes resources unnecessarily.",
+        "tone": "Empathetic & Transparent",
+        "channels": [
+          "press_release",
+          "social_media",
+          "internal_email"
+        ],
+        "key_actions": [
+          "Issue a vague, forward-looking press statement about upcoming products.",
+          "Engage with tech influencers on social media to build positive hype.",
+          "Send an internal email to staff to preemptively address any concerns.",
+          "Offer a pre-briefing to select journalists to shift the narrative."
+        ],
+        "estimated_cost_eur": 15000.0,
+        "estimated_impact": "Minimal positive impact, with a moderate risk of making the company seem reactive and amplifying a non-story.",
+        "roi_score": 3
+      },
+      {
+        "name": "Silence",
+        "description": "This strategy correctly identifies the situation as a non-crisis. It involves taking no public action while monitoring the situation, conserving resources and avoiding the creation of a news story where none exists.",
+        "tone": "Minimal & Observant",
+        "channels": [
+          "internal_monitoring"
+        ],
+        "key_actions": [
+          "Continue to monitor the article and related mentions for any change in sentiment.",
+          "Log the event and the faulty risk analysis for internal model improvement.",
+          "Prepare a reactive-only statement to be kept on standby and used only if the situation escalates dramatically.",
+          "Continue with normal business and marketing operations."
+        ],
+        "estimated_cost_eur": 500.0,
+        "estimated_impact": "Neutral. The non-story fades naturally with the news cycle, preserving brand equity and resources. VaR remains negligible.",
+        "roi_score": 10
+      }
+    ],
+    "recommended_strategy": "Silence",
+    "recommendation_reasoning": "The underlying data points to a non-crisis; the article is neutral speculation with minimal reach and financial impact (VaR €5,940). The 'Silence' strategy provides the highest ROI by avoiding the Streisand effect, where a public response would create a negative story from a neutral one. It correctly allocates minimal resources to a non-problem, which is the most efficient and logical course of action.",
+    "press_release": "FOR IMMEDIATE RELEASE\n\nApple Looks Forward to a Year of Innovation\n\nCUPERTINO, CA – Apple continues to focus on delivering groundbreaking products and experiences for its customers worldwide. Our teams are hard at work developing the next generation of hardware and software that will empower creativity, enhance productivity, and connect people in new ways.\n\nWe are incredibly excited about our product pipeline for the upcoming year and are committed to our long-standing tradition of surprising and delighting our users. At Apple, innovation is in our DNA, and we remain dedicated to designing products that enrich people's lives while upholding the highest standards of quality and privacy. We look forward to sharing more details about our latest advancements in due course and thank our customers for their continued passion and loyalty.",
+    "internal_email": "Subject: Focused on the Future\n\nHi Team,\n\nAs we move forward, I want to take a moment to recognize the incredible work being done across all departments at Apple. Your dedication and creativity are the driving force behind the products our customers love.\n\nOur product roadmap is as exciting as ever, and we are well-positioned to deliver another year of amazing innovation. Let's continue to focus on what we do best: building beautifully designed, high-quality products that empower people around the globe.\n\nThank you for your hard work and commitment. The future is bright, and I'm thrilled to see what we will achieve together.\n\nBest,",
+    "social_post": "We’re always dreaming up new ways to help you create, connect, and do what you love. The future is closer than you think. #Apple #Innovation",
+    "legal_notice_draft": "",
+    "decision_summary": "The situation was assessed as a non-crisis based on negligible financial risk (VaR €5,940) and minimal severity (1/5). The source article is routine speculation, not a negative report. The high churn risk (6.0%) was identified as a likely data anomaly. Therefore, a 'Silence' strategy was recommended to avoid amplifying a non-story and to conserve company resources, yielding the highest possible ROI."
+  },
+  "recommended_strategy_name": "Silence",
+  "precedents": [
+    {
+      "company": "Microsoft",
+      "year": "2012",
+      "crisis_summary": "Microsoft launched Windows 8 with a radical tile-based user interface that removed the traditional 'Start' button, causing widespread criticism from longtime desktop users.",
+      "crisis_title": "Windows 8 UI Backlash",
+      "crisis_type": "Reputation & Social",
+      "strategy_adopted": "After an initial defense, Microsoft acknowledged user backlash and released Windows 8.1 a year later, a free update that reintroduced the 'Start' button and other familiar features.",
+      "outcome": "PC shipments saw their 'worst decline in PC market history' (a 10% drop in 2013), and Windows 8 market share was only 5.1% by June 2013, lagging far behind its predecessor.",
+      "success_score": 6,
+      "lesson": "Ignoring the workflow and preferences of a core user base during a major redesign can lead to significant market share loss and reputational damage.",
+      "source_url": "https://vertexaisearch.cloud.google.com/grounding-api-redirect/AUZIYQGhHSRZPch_csFNb5AV2rrZELv1_be9vfzEuM0hOFVi0HILAQ_pi6doLODToMIhB7E9IpfaVEkN-k4B8MbWbeadh8zrxR0-IONBwumQkBlssU_ZohpcpcYNFkhJJNAznP0J7wNOkOu1Yez_plBTiUSojdFXP8CvK_cdaNmE-e2QkPXaLPPRtHc="
+    },
+    {
+      "company": "Gap Inc.",
+      "year": "2010",
+      "crisis_summary": "The clothing retailer abruptly replaced its iconic 20-year-old logo with a new design, which was met with immediate and overwhelming public backlash on social media.",
+      "crisis_title": "Logo Redesign Failure",
+      "crisis_type": "Reputation & Social",
+      "strategy_adopted": "After a brief defense and a failed attempt to crowdsource ideas, Gap announced it was scrapping the new logo and reverting to its original design in less than a week.",
+      "outcome": "The failed rebranding effort was a public relations disaster estimated to have cost the company $100 million, though the swift reversal prevented a more significant stock price drop.",
+      "success_score": 8,
+      "lesson": "Brand equity is a powerful asset; sudden, poorly communicated visual changes can alienate loyal customers and force a costly and embarrassing reversal.",
+      "source_url": "https://vertexaisearch.cloud.google.com/grounding-api-redirect/AUZIYQFtHAl2SxTW96thwcSvyLqOuq0zkla_RNONrYQaxlM92v31R3ZPAo2cK3nA-toGQeB5BzGxTUGm6w3k7nwV5klaYdE9F4M8_U5pxq4cyMhPkl6vMMgzKf3L-mtUm-_paXagpuuPIE6IJZSkyFhgJuB55DLijbZSc4ERoyKlFtZF9UZYiM4rsA=="
+    },
+    {
+      "company": "Tropicana Products",
+      "year": "2009",
+      "crisis_summary": "Tropicana launched a major redesign of its Pure Premium orange juice packaging, which consumers found generic and difficult to recognize on shelves.",
+      "crisis_title": "Packaging Redesign Backlash",
+      "crisis_type": "Reputation & Social",
+      "strategy_adopted": "In response to a sharp sales decline and consumer criticism, the company's president announced they would abandon the new packaging and revert to the original design.",
+      "outcome": "Sales plummeted by 20% in two months, resulting in a loss of over $30 million, forcing the company to quickly reverse its decision.",
+      "success_score": 8,
+      "lesson": "Never underestimate the deep emotional bond and functional reliance consumers have with familiar product packaging.",
+      "source_url": "https://www.google.com/search?q=Tropicana+Products+crisis+case+study"
+    },
+    {
+      "company": "The Coca-Cola Company",
+      "year": "1985",
+      "crisis_summary": "In response to losing market share, the company changed the formula of its flagship beverage for the first time in 99 years, vastly underestimating the public's emotional attachment to the original.",
+      "crisis_title": "'New Coke' Fiasco",
+      "crisis_type": "Reputation & Social",
+      "strategy_adopted": "After initially defending the change, the company responded to massive public backlash by holding a press conference 79 days later to announce the return of the original formula as 'Coca-Cola Classic'.",
+      "outcome": "The initial launch was a massive marketing blunder, but the return of the original formula led to a resurgence in sales and ultimately solidified Coca-Cola's market dominance.",
+      "success_score": 9,
+      "lesson": "Consumer attachment to a beloved product can be a powerful emotional force that market research and taste tests fail to capture.",
+      "source_url": "https://vertexaisearch.cloud.google.com/grounding-api-redirect/AUZIYQEj9VRHAcdg4d5vaLkJMGiC4-XdikJb_SUhwTHlzdaYGaudSFlg_nZZ5HEafnQ6XeZ23YjhIvR-pe6xP62FktvpQ3urg_bCitOENCfJUpMhabg4JS0rwQfegl9pYXgNS5Ln7aM1rKZ4GXNExKHpt9h6c5MKWHbGO-EFZTDL"
+    }
+  ],
+  "global_lesson": "Swiftly acknowledging and responding to the core user base's emotional attachment to established product designs is critical to mitigating reputational and financial damage.",
+  "confidence": "high",
+  "invoice": {
+    "line_items": [],
+    "total_human_equivalent_eur": 0.0,
+    "total_api_cost_eur": 0.15,
+    "total_gross_margin_percent": 0.0,
+    "roi_multiplier": 0.0,
+    "invoice_summary": "No billable action — crisis assessed as IGNORE level.",
+    "trade_off_reasoning": "The AI agents determined this situation does not warrant a crisis response. A traditional PR agency would have charged a minimum retainer fee (typically €2,500+) just for the initial assessment. Our AI completed the analysis at minimal compute cost.",
+    "action_refused": true,
+    "refusal_reason": "Alert level is IGNORE — the crisis is too minor to warrant billable deliverables. Only monitoring costs were incurred."
+  }
+}
