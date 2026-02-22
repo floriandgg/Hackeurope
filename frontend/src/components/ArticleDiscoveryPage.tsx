@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import type { TopicGroup, Article } from '../api';
+import AgentScene from './AgentScene';
 
 export type { TopicGroup, Article };
 
@@ -553,6 +554,16 @@ export default function ArticleDiscoveryPage({
                   </div>
                 </div>
               )}
+
+              {/* Agent Scene */}
+              <div className="mt-6">
+                <AgentScene
+                  scenario="discovery"
+                  completedSteps={completedSteps}
+                  activeStep={activeStep}
+                  isDone={completedSteps >= AGENT_STEPS.length}
+                />
+              </div>
             </div>
           </aside>
 

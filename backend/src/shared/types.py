@@ -229,6 +229,9 @@ class InvoiceLineItem(BaseModel):
 
 class Agent5Output(BaseModel):
     """Structured output of Agent 5 (The CFO)."""
+    tier_name: str = Field(default="", description="Pricing tier name, e.g. 'Full Defense'")
+    tier_label: str = Field(default="", description="Pricing tier label, e.g. 'Crise Majeure'")
+    tier_price_eur: float = Field(default=0.0, ge=0, description="Fixed tier price in EUR")
     line_items: List[InvoiceLineItem] = Field(description="Invoice line items, one per agent")
     total_human_equivalent_eur: float = Field(ge=0, description="Sum of all human-equivalent values")
     total_api_cost_eur: float = Field(ge=0, description="Sum of all actual API costs")
