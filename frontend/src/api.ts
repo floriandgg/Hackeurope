@@ -25,7 +25,7 @@ export interface BackendSubject {
 }
 
 /** Full response from POST /api/search */
-interface SearchResponse {
+export interface SearchResponse {
   company_name: string;
   crisis_id: string;
   subjects: BackendSubject[];
@@ -187,7 +187,7 @@ function normalizeCriticality(exposureScore: number): number {
 
 /* ─── Transform: Agent 1 ─── */
 
-function transformSubjects(subjects: BackendSubject[]): TopicGroup[] {
+export function transformSubjects(subjects: BackendSubject[]): TopicGroup[] {
   return subjects.map((subj) => ({
     name: subj.title,
     summary: subj.summary,
@@ -206,7 +206,7 @@ function transformSubjects(subjects: BackendSubject[]): TopicGroup[] {
 
 /* ─── Transform: Agent 2 ─── */
 
-function transformPrecedents(data: PrecedentsResponse): PrecedentsData {
+export function transformPrecedents(data: PrecedentsResponse): PrecedentsData {
   const cases: PrecedentCase[] = data.precedents.map((p) => {
     const articles: PrecedentArticle[] = [];
     if (p.source_url) {
@@ -236,6 +236,54 @@ function transformPrecedents(data: PrecedentsResponse): PrecedentsData {
     globalLesson: data.global_lesson,
     confidence: data.confidence,
   };
+}
+
+/* ─── Agent 5 types ─── */
+
+/** Single invoice line item from the backend */
+interface BackendInvoiceLineItem {
+  agent: string;
+  event: string;
+  human_equivalent_value_eur: number;
+  api_compute_cost_eur: number;
+  gross_margin_percent: number;
+  detail: string;
+}
+
+/** Full invoice from the backend */
+interface BackendInvoice {
+  line_items: BackendInvoiceLineItem[];
+  total_human_equivalent_eur: number;
+  total_api_cost_eur: number;
+  total_gross_margin_percent: number;
+  roi_multiplier: number;
+  invoice_summary: string;
+  trade_off_reasoning: string;
+  action_refused: boolean;
+  refusal_reason: string;
+}
+
+/** Frontend-ready invoice line item */
+export interface InvoiceLineItem {
+  agent: string;
+  event: string;
+  humanEquivalentValueEur: number;
+  apiComputeCostEur: number;
+  grossMarginPercent: number;
+  detail: string;
+}
+
+/** Frontend-ready invoice data */
+export interface InvoiceData {
+  lineItems: InvoiceLineItem[];
+  totalHumanEquivalentEur: number;
+  totalApiCostEur: number;
+  totalGrossMarginPercent: number;
+  roiMultiplier: number;
+  invoiceSummary: string;
+  tradeOffReasoning: string;
+  actionRefused: boolean;
+  refusalReason: string;
 }
 
 /* ─── Agent 4 types ─── */
@@ -268,12 +316,13 @@ interface BackendStrategyReport {
 }
 
 /** Full response from POST /api/crisis-response */
-interface CrisisResponseResponse {
+export interface CrisisResponseResponse {
   strategy_report: BackendStrategyReport;
   recommended_strategy_name: string;
   precedents: BackendPrecedent[];
   global_lesson: string;
   confidence: string;
+  invoice?: BackendInvoice;
 }
 
 /** Frontend-ready strategy (one of 3) */
@@ -307,7 +356,7 @@ export interface StrategyData {
 
 /* ─── Transform: Agent 4 ─── */
 
-function transformStrategyReport(data: CrisisResponseResponse): StrategyData {
+export function transformStrategyReport(data: CrisisResponseResponse): StrategyData {
   const r = data.strategy_report;
   if (!r || !r.strategies || r.strategies.length === 0) {
     throw new Error('Backend returned empty strategy report — Agent 4 may have failed.');
@@ -335,6 +384,29 @@ function transformStrategyReport(data: CrisisResponseResponse): StrategyData {
       legalNotice: r.legal_notice_draft || '',
     },
     decisionSummary: r.decision_summary || '',
+  };
+}
+
+/* ─── Transform: Agent 5 ─── */
+
+export function transformInvoice(data: BackendInvoice): InvoiceData {
+  return {
+    lineItems: (data.line_items || []).map((li) => ({
+      agent: li.agent,
+      event: li.event,
+      humanEquivalentValueEur: li.human_equivalent_value_eur || 0,
+      apiComputeCostEur: li.api_compute_cost_eur || 0,
+      grossMarginPercent: li.gross_margin_percent || 0,
+      detail: li.detail || '',
+    })),
+    totalHumanEquivalentEur: data.total_human_equivalent_eur || 0,
+    totalApiCostEur: data.total_api_cost_eur || 0,
+    totalGrossMarginPercent: data.total_gross_margin_percent || 0,
+    roiMultiplier: data.roi_multiplier || 0,
+    invoiceSummary: data.invoice_summary || '',
+    tradeOffReasoning: data.trade_off_reasoning || '',
+    actionRefused: data.action_refused || false,
+    refusalReason: data.refusal_reason || '',
   };
 }
 
@@ -598,6 +670,45 @@ const MOCK_STRATEGY_DATA: StrategyData = {
   decisionSummary: 'With a total VaR of €45,200 and moderate media reach, this crisis warrants active management. Historical precedents show that transparent, proactive responses in similar situations recovered trust 3x faster. The Diplomate strategy offers the best ROI at 8/10, balancing cost efficiency with trust recovery speed.',
 };
 
+/* ─── Debug mock data: Agent 5 ─── */
+
+const MOCK_INVOICE_DATA: InvoiceData = {
+  lineItems: [
+    {
+      agent: 'Historical Strategist',
+      event: 'historical_precedents_extracted',
+      humanEquivalentValueEur: 1800,
+      apiComputeCostEur: 0.122,
+      grossMarginPercent: 99.99,
+      detail: '4 cases \u00d7 3h \u00d7 \u20ac150/h',
+    },
+    {
+      agent: 'Risk Analyst',
+      event: 'risk_assessment_completed',
+      humanEquivalentValueEur: 504.52,
+      apiComputeCostEur: 0.048,
+      grossMarginPercent: 99.99,
+      detail: '\u20ac500 base + 0.01% of \u20ac45,200 VaR',
+    },
+    {
+      agent: 'Executive Strategist',
+      event: 'crisis_strategy_delivered',
+      humanEquivalentValueEur: 2500,
+      apiComputeCostEur: 0.02,
+      grossMarginPercent: 99.99,
+      detail: 'Full crisis mitigation plan (fixed fee)',
+    },
+  ],
+  totalHumanEquivalentEur: 4804.52,
+  totalApiCostEur: 0.19,
+  totalGrossMarginPercent: 99.99,
+  roiMultiplier: 25287,
+  invoiceSummary: 'Crisis response delivered for \u20ac0.19 in API costs \u2014 equivalent to \u20ac4,804.52 in traditional consulting fees (25,287\u00d7 ROI).',
+  tradeOffReasoning: 'A traditional PR agency would charge \u20ac4,804.52 for this level of crisis response: \u20ac1,800.00 for precedent research (12h of analyst work), \u20ac504.52 for financial risk assessment, and \u20ac2,500.00 for strategy development with communication drafts. Our AI agents delivered identical outputs in under 60 seconds at 99.99% gross margin, saving the client \u20ac4,804.33.',
+  actionRefused: false,
+  refusalReason: '',
+};
+
 /** Debug mode: add ?debug to the URL to skip the backend and use mock data */
 const isDebug = typeof window !== 'undefined' && new URLSearchParams(window.location.search).has('debug');
 
@@ -659,11 +770,11 @@ export async function fetchPrecedents(companyName: string, topic: TopicGroup): P
 export async function fetchCrisisResponse(
   companyName: string,
   topic: TopicGroup,
-): Promise<{ strategyData: StrategyData; precedentsData: PrecedentsData }> {
+): Promise<{ strategyData: StrategyData; precedentsData: PrecedentsData; invoiceData: InvoiceData | null }> {
   if (isDebug) {
     await new Promise((r) => setTimeout(r, 5000));
     console.log(`[DEBUG MODE] Returning mock crisis response for "${topic.name}"`);
-    return { strategyData: MOCK_STRATEGY_DATA, precedentsData: MOCK_PRECEDENTS };
+    return { strategyData: MOCK_STRATEGY_DATA, precedentsData: MOCK_PRECEDENTS, invoiceData: MOCK_INVOICE_DATA };
   }
 
   const res = await fetch('/api/crisis-response', {
@@ -694,5 +805,6 @@ export async function fetchCrisisResponse(
       global_lesson: data.global_lesson,
       confidence: data.confidence,
     }),
+    invoiceData: data.invoice ? transformInvoice(data.invoice) : null,
   };
 }

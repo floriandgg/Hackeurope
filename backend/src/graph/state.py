@@ -44,3 +44,6 @@ class GraphState(TypedDict, total=False):
     agent2_api_cost_eur: float
     agent3_api_cost_eur: float
     agent4_api_cost_eur: float
+
+    # Agent 5 — invoice / ROI
+    invoice: dict[str, Any]

@@ -1,0 +1,152 @@
+{
+  "company_name": "OpenAI",
+  "crisis_id": "4967197d-9818-4a8b-b191-38ea76d206df",
+  "subjects": [
+    {
+      "subject": "ethics_management",
+      "title": "Ethics & Management",
+      "summary": "OpenAI employees considered alerting law enforcement about a user's violent interactions with ChatGPT months before she became a suspect in a mass shooting in British Columbia, but ultimately decided against it. The company's decision not to inform authorities about Jesse Van Rootselaar's descriptio",
+      "article_count": 6,
+      "articles": [
+        {
+          "title": "Exclusive | OpenAI Employees Raised Alarms About Canada Shooting Suspect Months Ago - The Wall Street Journal",
+          "summary": "OpenAI employees considered alerting law enforcement about a user's violent interactions with ChatGPT months before she became a suspect in a mass shooting in British Columbia, but ultimately decided against it. The company's decision not to inform authorities about Jesse Van Rootselaar's descriptio",
+          "url": "https://www.wsj.com/us-news/law/openai-employees-raised-alarms-about-canada-shooting-suspect-months-ago-b585df62",
+          "pub_date": "Fri, 20 Feb 2026 21:29:00 GMT",
+          "author": "Georgia Wells",
+          "subject": "ethics_management",
+          "sentiment": "negative",
+          "authority_score": 5,
+          "severity_score": 4,
+          "recency_multiplier": 1.5,
+          "exposure_score": 54.0
+        },
+        {
+          "title": "OpenAI debated calling police about suspected Canadian shooter’s chats - TechCrunch",
+          "summary": "OpenAI staff debated whether to report an 18-year-old suspected Canadian shooter's alarming ChatGPT chats, which described gun violence, to law enforcement but initially decided against it. The company later contacted authorities after the mass shooting, stating the user's activity did not meet thei",
+          "url": "https://techcrunch.com/2026/02/21/openai-debated-calling-police-about-suspected-canadian-shooters-chats/",
+          "pub_date": "Sat, 21 Feb 2026 15:25:44 GMT",
+          "author": "Amanda Silberling",
+          "subject": "ethics_management",
+          "sentiment": "negative",
+          "authority_score": 4,
+          "severity_score": 4,
+          "recency_multiplier": 1.5,
+          "exposure_score": 43.2
+        },
+        {
+          "title": "AI safety shake-up: Top researchers quit OpenAI and Anthropic, warning of risks - AOL.com",
+          "summary": "Top researchers have resigned from OpenAI and Anthropic, citing concerns over AI safety and the companies' focus on engagement optimization. Former OpenAI researcher Zoë Hitzig warned that OpenAI's exploration of advertising in ChatGPT risks repeating Facebook's mistakes by subtly shaping user behav",
+          "url": "https://www.aol.com/articles/ai-safety-shake-top-researchers-224433284.html?utm_medium=Share&utm_content=sp_IjnMf2Jd_2f6cc739-7e5c-3172-9174-6f5bf3c5a485_c_2yg9DHOF3shR97aqfq7FQNvqejy&spot_im_redirect_source=share&spot_im_comment_id=sp_IjnMf2Jd_2f6cc739-7e5c-3172-9174-6f5bf3c5a485_c_2yg9DHOF3shR97aqfq7FQNvqejy&spot_im_highlight_immediate=true&ow_module=conversation",
+          "pub_date": "Mon, 16 Feb 2026 22:44:33 GMT",
+          "author": "",
+          "subject": "ethics_management",
+          "sentiment": "negative",
+          "authority_score": 4,
+          "severity_score": 3,
+          "recency_multiplier": 1.2,
+          "exposure_score": 25.92
+        },
+        {
+          "title": "The Guardian view on AI: safety staff departures raise worries about industry pursuing profit at all costs | Editorial - The Guardian",
+          "summary": "The article criticizes the AI industry, citing departures of safety staff from OpenAI and Anthropic, and incidents like Elon Musk's Grok misuse, as evidence that commercial pressures are leading companies to prioritize profit over safety and ethical considerations. It raises concerns about manipulat",
+          "url": "https://www.theguardian.com/commentisfree/2026/feb/15/the-guardian-view-on-ai-safety-staff-departures-raise-worries-about-industry-pursuing-profit-at-all-costs",
+          "pub_date": "Sun, 15 Feb 2026 17:25:27 GMT",
+          "author": "",
+          "subject": "ethics_management",
+          "sentiment": "negative",
+          "authority_score": 5,
+          "severity_score": 2,
+          "recency_multiplier": 1.2,
+          "exposure_score": 21.6
+        },
+        {
+          "title": "Tech workers in a fierce competition to write the best resignation letters - Business Insider",
+          "summary": "OpenAI has faced leadership instability, including Sam Altman's dramatic firing and reinstatement. Recent resignations, like Zoë Hitzig's, stem from ethical concerns over ChatGPT incorporating ads. Critics warn that leveraging user conversations for targeted ads could manipulate users and undermine ",
+          "url": "https://www.businessinsider.com/resignation-letters-quit-openai-anthropic-2026-2",
+          "pub_date": "Mon, 16 Feb 2026 09:09:01 GMT",
+          "author": "",
+          "subject": "ethics_management",
+          "sentiment": "negative",
+          "authority_score": 4,
+          "severity_score": 2,
+          "recency_multiplier": 1.2,
+          "exposure_score": 17.28
+        },
+        {
+          "title": "OpenAI's new hire has his work cut out for him with Hollywood celebrities. - Business Insider",
+          "summary": "OpenAI has hired Charles Porch, former head of partnerships at Instagram, to address Hollywood celebrities' negative perceptions and fears about AI. Porch, known for his strong connections in the entertainment industry, will work to improve OpenAI's image among those who view AI as a detriment to hu",
+          "url": "https://www.businessinsider.com/openai-hollywood-charles-porch-meta-celebrities-2026-2",
+          "pub_date": "Thu, 19 Feb 2026 10:05:01 GMT",
+          "author": "",
+          "subject": "ethics_management",
+          "sentiment": "neutral",
+          "authority_score": 4,
+          "severity_score": 2,
+          "recency_multiplier": 1.5,
+          "exposure_score": 10.8
+        }
+      ]
+    },
+    {
+      "subject": "security_fraud",
+      "title": "Security & Fraud",
+      "summary": "OpenAI considered alerting Canadian police about a user, Jesse Van Rootselaar, in June 2023 due to \"furtherance of violent activities\" detected on ChatGPT, but decided not to refer the account to law enforcement as it didn't meet their threshold. Months later, Van Rootselaar committed a school shoot",
+      "article_count": 4,
+      "articles": [
+        {
+          "title": "ChatGPT-maker OpenAI considered alerting Canadian police about school shooting suspect months ago - AP News",
+          "summary": "OpenAI considered alerting Canadian police about a user, Jesse Van Rootselaar, in June 2023 due to \"furtherance of violent activities\" detected on ChatGPT, but decided not to refer the account to law enforcement as it didn't meet their threshold. Months later, Van Rootselaar committed a school shoot",
+          "url": "https://apnews.com/article/openai-chatgpt-canada-school-shooting-suspect-d574e2703a6e9472b59aa3a5371c57a5",
+          "pub_date": "Sat, 21 Feb 2026 01:42:40 GMT",
+          "author": "",
+          "subject": "security_fraud",
+          "sentiment": "negative",
+          "authority_score": 5,
+          "severity_score": 4,
+          "recency_multiplier": 1.5,
+          "exposure_score": 54.0
+        },
+        {
+          "title": "OpenAI considered alerting Canadian police about school shooting suspect months ago - The Guardian",
+          "summary": "OpenAI reportedly considered alerting Canadian police months ago about a school shooting suspect. The article from The Guardian discusses OpenAI's internal deliberations regarding this serious matter.",
+          "url": "https://www.theguardian.com/world/2026/feb/21/tumbler-ridge-shooter-chatgpt-openai",
+          "pub_date": "Sat, 21 Feb 2026 03:18:09 GMT",
+          "author": "",
+          "subject": "security_fraud",
+          "sentiment": "neutral",
+          "authority_score": 5,
+          "severity_score": 4,
+          "recency_multiplier": 1.5,
+          "exposure_score": 27.0
+        },
+        {
+          "title": "Open-Source AI Assistant OpenClaw Gains Rapid Traction Amidst Significant Security Concerns and Chaotic Debut - avandatimes.com",
+          "summary": "The open-source AI assistant OpenClaw is experiencing rapid adoption despite significant security concerns and a chaotic launch. The article highlights the dual nature of its debut, combining quick traction with notable issues.",
+          "url": "https://avandatimes.com/tech/open-source-ai-assistant-openclaw-gains-rapid-traction-amidst-significant-security-concerns-and-chaotic-debut/",
+          "pub_date": "Sun, 15 Feb 2026 22:46:20 GMT",
+          "author": "Jimmy",
+          "subject": "security_fraud",
+          "sentiment": "negative",
+          "authority_score": 3,
+          "severity_score": 4,
+          "recency_multiplier": 1.2,
+          "exposure_score": 25.92
+        },
+        {
+          "title": "OpenClaw founder joins OpenAI - iTnews",
+          "summary": "Peter Steinberger, founder of OpenClaw, is joining OpenAI, and OpenClaw will transition into a foundation. China's industry ministry has issued a warning that the open-source AI agent, OpenClaw, could pose significant security risks, including cyberattacks and data breaches, if not properly configur",
+          "url": "https://www.itnews.com.au/news/openclaw-founder-joins-openai-623662",
+          "pub_date": "Mon, 16 Feb 2026 19:44:00 GMT",
+          "author": "Staff Writer",
+          "subject": "security_fraud",
+          "sentiment": "neutral",
+          "authority_score": 3,
+          "severity_score": 2,
+          "recency_multiplier": 1.2,
+          "exposure_score": 6.48
+        }
+      ]
+    }
+  ]
+}

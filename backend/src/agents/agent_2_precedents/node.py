@@ -691,6 +691,7 @@ def precedents_node_from_topic(
                 "precedents": [],
                 "global_lesson": "No relevant historical precedents found for this crisis type.",
                 "confidence": "low",
+                "agent2_api_cost_eur": 0.105,  # 3 searches still ran
             }
 
         # Step 2.3: Extract & Verify
@@ -723,10 +724,14 @@ def precedents_node_from_topic(
             print(f"[AGENT 2]   -> {case.company} (score: {case.success_score}/10)")
         print(f"[AGENT 2]   Lesson: {output.global_lesson}")
 
+        # API cost: 3 grounded searches + Pro extraction + Flash verification
+        api_cost = (0.035 * 3) + 0.015 + 0.002
+
         return {
             "precedents": past_cases_dicts,
             "global_lesson": output.global_lesson,
             "confidence": confidence_label,
+            "agent2_api_cost_eur": round(api_cost, 4),
         }
 
     except Exception as e:
@@ -737,4 +742,5 @@ def precedents_node_from_topic(
             "precedents": [],
             "global_lesson": "Analysis could not be completed due to a technical error.",
             "confidence": "low",
+            "agent2_api_cost_eur": 0.0,
         }

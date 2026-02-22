@@ -271,26 +271,42 @@ export default function PrecedentsPage({
       const timers: ReturnType<typeof setTimeout>[] = [];
       const cases = precedentsData.cases;
 
+      // If data arrived before any steps animated (pre-loaded / demo mode),
+      // rapid-fire steps 0–4 first so the timeline doesn't stay gray.
+      const preloaded = completedSteps === 0;
+      const rapidDelay = 150;
+      let baseOffset = 0;
+
+      if (preloaded) {
+        const stepsToAnimate = PRECEDENT_AGENT_STEPS.length - 1;
+        for (let i = 0; i < stepsToAnimate; i++) {
+          timers.push(setTimeout(() => setActiveStep(i), i * rapidDelay));
+          timers.push(setTimeout(() => setCompletedSteps(i + 1), i * rapidDelay + 100));
+        }
+        baseOffset = stepsToAnimate * rapidDelay;
+      }
+
       // Complete final agent step
-      timers.push(setTimeout(() => setActiveStep(PRECEDENT_AGENT_STEPS.length - 1), 100));
-      timers.push(setTimeout(() => setCompletedSteps(PRECEDENT_AGENT_STEPS.length), 400));
+      timers.push(setTimeout(() => setActiveStep(PRECEDENT_AGENT_STEPS.length - 1), baseOffset + 100));
+      timers.push(setTimeout(() => setCompletedSteps(PRECEDENT_AGENT_STEPS.length), baseOffset + 400));
 
       // Stagger-reveal cases (adaptive timing)
       const stagger = cases.length <= 3 ? 600 : cases.length <= 5 ? 500 : 400;
       cases.forEach((_, i) => {
-        timers.push(setTimeout(() => setVisibleCases(i + 1), 600 + i * stagger));
+        timers.push(setTimeout(() => setVisibleCases(i + 1), baseOffset + 600 + i * stagger));
       });
 
       // Show summary after all cases revealed
       timers.push(
         setTimeout(
           () => setShowSummary(true),
-          600 + cases.length * stagger + 300,
+          baseOffset + 600 + cases.length * stagger + 300,
         ),
       );
 
       return () => timers.forEach(clearTimeout);
     }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isLoading, precedentsData]);
 
   const cases = precedentsData?.cases ?? [];

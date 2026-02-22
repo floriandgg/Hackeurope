@@ -185,3 +185,29 @@ class Agent4Output(BaseModel):
     legal_notice_draft: str = Field(default="", description="Draft legal notice / mise en demeure (only if alert_level is CRITICAL, else empty)")
 
     decision_summary: str = Field(description="Human-readable summary of the decision logic applied (3-5 lines)")
+
+
+# --- Agent 5: CFO / Invoice structured output ---
+
+
+class InvoiceLineItem(BaseModel):
+    """One line on the crisis management invoice."""
+    agent: str = Field(description="Agent name, e.g. 'Historical Strategist'")
+    event: str = Field(description="Paid.ai event name")
+    human_equivalent_value_eur: float = Field(ge=0, description="What a human consultant would charge")
+    api_compute_cost_eur: float = Field(ge=0, description="Actual API cost in EUR")
+    gross_margin_percent: float = Field(description="Gross margin percentage")
+    detail: str = Field(default="", description="Short explanation of the billing formula")
+
+
+class Agent5Output(BaseModel):
+    """Structured output of Agent 5 (The CFO)."""
+    line_items: List[InvoiceLineItem] = Field(description="Invoice line items, one per agent")
+    total_human_equivalent_eur: float = Field(ge=0, description="Sum of all human-equivalent values")
+    total_api_cost_eur: float = Field(ge=0, description="Sum of all actual API costs")
+    total_gross_margin_percent: float = Field(description="Overall gross margin")
+    roi_multiplier: float = Field(ge=0, description="How many times cheaper AI is vs human (human_value / api_cost)")
+    invoice_summary: str = Field(description="1-2 sentence invoice summary for the client")
+    trade_off_reasoning: str = Field(description="Why AI crisis management delivers better ROI than a traditional agency")
+    action_refused: bool = Field(default=False, description="True if the crisis was too minor to warrant billable action")
+    refusal_reason: str = Field(default="", description="Explanation if action was refused")

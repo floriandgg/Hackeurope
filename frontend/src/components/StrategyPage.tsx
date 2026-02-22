@@ -17,6 +17,7 @@ interface StrategyPageProps {
   onBack: () => void;
   onViewDrafts: (strategyIndex: number) => void;
   onSeeWhy: () => void;
+  onViewInvoice: () => void;
 }
 
 /* ─── Agent Timeline Steps ─── */
@@ -293,6 +294,7 @@ export default function StrategyPage({
   onBack,
   onViewDrafts,
   onSeeWhy,
+  onViewInvoice,
 }: StrategyPageProps) {
   const [completedSteps, setCompletedSteps] = useState(0);
   const [activeStep, setActiveStep] = useState(0);
@@ -322,25 +324,41 @@ export default function StrategyPage({
       const timers: ReturnType<typeof setTimeout>[] = [];
       const strategies = strategyData.strategies;
 
+      // If data arrived before any steps animated (pre-loaded / demo mode),
+      // rapid-fire steps 0–4 first so the timeline doesn't stay gray.
+      const preloaded = completedSteps === 0;
+      const rapidDelay = 150;
+      let baseOffset = 0;
+
+      if (preloaded) {
+        const stepsToAnimate = STRATEGY_AGENT_STEPS.length - 1;
+        for (let i = 0; i < stepsToAnimate; i++) {
+          timers.push(setTimeout(() => setActiveStep(i), i * rapidDelay));
+          timers.push(setTimeout(() => setCompletedSteps(i + 1), i * rapidDelay + 100));
+        }
+        baseOffset = stepsToAnimate * rapidDelay;
+      }
+
       // Complete final agent step
-      timers.push(setTimeout(() => setActiveStep(STRATEGY_AGENT_STEPS.length - 1), 100));
-      timers.push(setTimeout(() => setCompletedSteps(STRATEGY_AGENT_STEPS.length), 400));
+      timers.push(setTimeout(() => setActiveStep(STRATEGY_AGENT_STEPS.length - 1), baseOffset + 100));
+      timers.push(setTimeout(() => setCompletedSteps(STRATEGY_AGENT_STEPS.length), baseOffset + 400));
 
       // Stagger-reveal strategies
       strategies.forEach((_, i) => {
-        timers.push(setTimeout(() => setVisibleStrategies(i + 1), 600 + i * 400));
+        timers.push(setTimeout(() => setVisibleStrategies(i + 1), baseOffset + 600 + i * 400));
       });
 
       // Show summary after all strategies revealed
       timers.push(
         setTimeout(
           () => setShowSummary(true),
-          600 + strategies.length * 400 + 300,
+          baseOffset + 600 + strategies.length * 400 + 300,
         ),
       );
 
       return () => timers.forEach(clearTimeout);
     }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isLoading, strategyData]);
 
   const strategies = strategyData?.strategies ?? [];
@@ -677,9 +695,9 @@ export default function StrategyPage({
                   </p>
                 </div>
 
-                {/* See Why button */}
+                {/* See Why + Cost Breakdown buttons */}
                 <div
-                  className="opacity-0 animate-fade-in-up"
+                  className="flex flex-col sm:flex-row items-center gap-3 opacity-0 animate-fade-in-up"
                   style={{ animationDelay: '400ms' }}
                 >
                   <button
@@ -722,6 +740,51 @@ export default function StrategyPage({
                       className="text-silver group-hover:text-royal transition-all duration-200 group-hover:translate-y-0.5"
                     >
                       <path d="M6 9l6 6 6-6" />
+                    </svg>
+                  </button>
+
+                  <button
+                    onClick={onViewInvoice}
+                    className="group flex items-center gap-2.5 px-6 py-3 rounded-full
+                               border border-silver/30 bg-white/80 backdrop-blur-sm
+                               shadow-[0_2px_12px_rgba(0,0,0,0.04)]
+                               hover:border-royal/20 hover:shadow-[0_4px_20px_rgba(43,58,143,0.08)]
+                               transition-all duration-300"
+                  >
+                    <svg
+                      width="16"
+                      height="16"
+                      viewBox="0 0 24 24"
+                      fill="none"
+                      stroke="currentColor"
+                      strokeWidth="2"
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      className="text-royal/70 group-hover:text-royal transition-colors"
+                    >
+                      <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
+                      <polyline points="14 2 14 8 20 8" />
+                      <line x1="16" y1="13" x2="8" y2="13" />
+                      <line x1="16" y1="17" x2="8" y2="17" />
+                    </svg>
+                    <span className="text-sm font-body font-medium text-storm group-hover:text-charcoal transition-colors">
+                      Cost Breakdown
+                    </span>
+                    <span className="text-[11px] text-silver group-hover:text-storm transition-colors">
+                      — Agency vs AI cost
+                    </span>
+                    <svg
+                      width="14"
+                      height="14"
+                      viewBox="0 0 24 24"
+                      fill="none"
+                      stroke="currentColor"
+                      strokeWidth="2"
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      className="text-silver group-hover:text-royal transition-all duration-200 group-hover:translate-x-0.5"
+                    >
+                      <path d="M5 12h14M12 5l7 7-7 7" />
                     </svg>
                   </button>
                 </div>

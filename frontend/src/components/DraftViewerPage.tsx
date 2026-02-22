@@ -30,11 +30,6 @@ interface Channel {
   icon: React.ReactNode;
 }
 
-interface ToneMetric {
-  label: string;
-  value: number;
-}
-
 
 /* ═══════════════════════════════════════════════════════════════════
    Strategy color helpers
@@ -122,39 +117,6 @@ const CHANNELS: Channel[] = [
   { name: 'Social Post', icon: TweetIcon },
   { name: 'Legal Notice', icon: LegalIcon },
 ];
-
-/* ═══════════════════════════════════════════════════════════════════
-   Tone Analysis Data (mock — Agent 4 doesn't produce this)
-   ═══════════════════════════════════════════════════════════════════ */
-
-const TONE_DATA: ToneMetric[][] = [
-  // Offensive
-  [
-    { label: 'Empathy', value: 15 },
-    { label: 'Urgency', value: 22 },
-    { label: 'Authority', value: 90 },
-    { label: 'Deflection', value: 78 },
-    { label: 'Legal risk', value: 85 },
-  ],
-  // Diplomate
-  [
-    { label: 'Empathy', value: 82 },
-    { label: 'Urgency', value: 65 },
-    { label: 'Authority', value: 95 },
-    { label: 'Deflection', value: 12 },
-    { label: 'Legal risk', value: 35 },
-  ],
-  // Silence
-  [
-    { label: 'Empathy', value: 55 },
-    { label: 'Urgency', value: 48 },
-    { label: 'Authority', value: 88 },
-    { label: 'Deflection', value: 52 },
-    { label: 'Legal risk', value: 50 },
-  ],
-];
-
-const READING_LEVELS = ['Grade 14', 'Grade 9', 'Grade 11'];
 
 
 /* ═══════════════════════════════════════════════════════════════════
@@ -257,60 +219,6 @@ function CrisisTimeline({
   );
 }
 
-/* ═══════════════════════════════════════════════════════════════════
-   Tone Analysis Card
-   ═══════════════════════════════════════════════════════════════════ */
-
-function ToneAnalysisCard({
-  metrics,
-  readingLevel,
-  strategyColor,
-}: {
-  metrics: ToneMetric[];
-  readingLevel: string;
-  strategyColor: string;
-}) {
-  return (
-    <div className="rounded-2xl border border-mist bg-white p-6 shadow-[0_2px_16px_rgba(0,0,0,0.04)]">
-      <div className="flex items-center justify-between mb-5">
-        <h4 className="text-[11px] font-body font-semibold text-silver tracking-[0.15em] uppercase">
-          Tone Analysis
-        </h4>
-        <div>
-          <span className="text-[11px] font-body text-silver">Reading level:</span>
-          <span className="text-[12px] font-body font-semibold text-charcoal ml-2">
-            {readingLevel}
-          </span>
-          {readingLevel === 'Grade 9' && (
-            <span className="text-[11px] text-emerald-600 ml-1.5">(accessible)</span>
-          )}
-        </div>
-      </div>
-      <div className="grid grid-cols-2 sm:grid-cols-5 gap-x-8 gap-y-4">
-        {metrics.map((m) => (
-          <div key={m.label}>
-            <div className="flex items-center justify-between mb-1.5">
-              <span className="text-[12px] font-body text-storm">{m.label}</span>
-              <span className="text-[11px] font-body font-medium text-charcoal tabular-nums">
-                {m.value}%
-              </span>
-            </div>
-            <div className="w-full h-2 rounded-full bg-mist overflow-hidden">
-              <div
-                className="h-full rounded-full transition-all duration-700 ease-out"
-                style={{
-                  width: `${m.value}%`,
-                  backgroundColor: m.value > 70 ? strategyColor : m.value > 40 ? '#f59e0b' : '#e8eaf0',
-                }}
-              />
-            </div>
-          </div>
-        ))}
-      </div>
-    </div>
-  );
-}
-
 
 /* ═══════════════════════════════════════════════════════════════════
    Draft Content Helper
@@ -345,9 +253,6 @@ export default function DraftViewerPage({
 
   const meta = getStrategyMeta(strategyData, strategyIndex);
   const draftText = getDraftContent(strategyData, activeChannel);
-  const toneMetrics = TONE_DATA[strategyIndex] ?? TONE_DATA[0];
-  const readingLevel = READING_LEVELS[strategyIndex] ?? READING_LEVELS[0];
-
   // Map timeline click -> channel
   const activeTimelineNode = TIMELINE_NODES.findIndex((n) => n.channelIndex === activeChannel);
 
@@ -581,17 +486,7 @@ export default function DraftViewerPage({
               </div>
             </div>
 
-            {/* ── Tone Analysis — full width ── */}
-            <div
-              className="opacity-0 animate-fade-in-up mb-8"
-              style={{ animationDelay: '550ms' }}
-            >
-              <ToneAnalysisCard
-                metrics={toneMetrics}
-                readingLevel={readingLevel}
-                strategyColor={meta.color}
-              />
-            </div>
+
           </div>
         </main>
       </div>

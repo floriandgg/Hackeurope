@@ -27,6 +27,7 @@ from src.agents.agent_1_watcher.node import watcher_node
 from src.agents.agent_2_precedents.node import precedents_node_from_topic
 from src.agents.agent_3_scorer.node import scorer_from_articles
 from src.agents.agent_4_strategist.node import strategist_from_data
+from src.agents.agent_5_cfo.node import cfo_from_data
 
 app = FastAPI(title="Crisis PR Agent API")
 
@@ -121,10 +122,25 @@ def crisis_response(req: CrisisResponseRequest):
         severity_score=severity_score,
     )
 
+    # Step 4: Agent 5 — build invoice with ROI analysis
+    strategy_report = strategist_result.get("strategy_report", {})
+    alert_level = strategy_report.get("alert_level", "MEDIUM")
+    agent4_api_cost = strategist_result.get("agent4_api_cost_eur", 0.02)
+
+    cfo_result = cfo_from_data(
+        agent2_api_cost=precedents_result.get("agent2_api_cost_eur", 0.035),
+        agent3_api_cost=scorer_result.get("agent3_api_cost_eur", 0.08),
+        agent4_api_cost=agent4_api_cost,
+        cases_count=len(prec),
+        total_var_impact=total_var_impact,
+        alert_level=alert_level,
+    )
+
     return {
-        "strategy_report": strategist_result.get("strategy_report", {}),
+        "strategy_report": strategy_report,
         "recommended_strategy_name": strategist_result.get("recommended_strategy_name", ""),
         "precedents": prec,
         "global_lesson": global_lesson,
         "confidence": confidence,
+        "invoice": cfo_result.get("invoice", {}),
     }

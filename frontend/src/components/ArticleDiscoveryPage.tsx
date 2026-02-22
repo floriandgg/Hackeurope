@@ -292,25 +292,41 @@ export default function ArticleDiscoveryPage({
     if (!isLoading && topicGroups.length > 0) {
       const timers: ReturnType<typeof setTimeout>[] = [];
 
+      // If data arrived before any steps animated (pre-loaded / demo mode),
+      // rapid-fire steps 0–4 first so the timeline doesn't stay gray.
+      const preloaded = completedSteps === 0;
+      const rapidDelay = 150; // ms per step
+      let baseOffset = 0;
+
+      if (preloaded) {
+        const stepsToAnimate = AGENT_STEPS.length - 1;
+        for (let i = 0; i < stepsToAnimate; i++) {
+          timers.push(setTimeout(() => setActiveStep(i), i * rapidDelay));
+          timers.push(setTimeout(() => setCompletedSteps(i + 1), i * rapidDelay + 100));
+        }
+        baseOffset = stepsToAnimate * rapidDelay;
+      }
+
       // Complete final agent step
-      timers.push(setTimeout(() => setActiveStep(AGENT_STEPS.length - 1), 100));
-      timers.push(setTimeout(() => setCompletedSteps(AGENT_STEPS.length), 400));
+      timers.push(setTimeout(() => setActiveStep(AGENT_STEPS.length - 1), baseOffset + 100));
+      timers.push(setTimeout(() => setCompletedSteps(AGENT_STEPS.length), baseOffset + 400));
 
       // Reveal topic cards with stagger
       topicGroups.forEach((_, i) => {
-        timers.push(setTimeout(() => setVisibleTopics(i + 1), 600 + i * 500));
+        timers.push(setTimeout(() => setVisibleTopics(i + 1), baseOffset + 600 + i * 500));
       });
 
       // Show summary after all topics revealed
       timers.push(
         setTimeout(
           () => setShowSummary(true),
-          600 + topicGroups.length * 500 + 300,
+          baseOffset + 600 + topicGroups.length * 500 + 300,
         ),
       );
 
       return () => timers.forEach(clearTimeout);
     }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isLoading, topicGroups]);
 
   /* ─ FLIP expansion: measure card → set start → expand ─ */

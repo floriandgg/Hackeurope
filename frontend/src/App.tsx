@@ -1,13 +1,15 @@
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useRef } from 'react'
 import LandingPage from './components/LandingPage'
 import ArticleDiscoveryPage from './components/ArticleDiscoveryPage'
 import StrategyPage from './components/StrategyPage'
 import PrecedentsPage from './components/PrecedentsPage'
 import DraftViewerPage from './components/DraftViewerPage'
-import { searchCompany, fetchCrisisResponse, type TopicGroup, type PrecedentsData, type StrategyData } from './api'
+import InvoicePage from './components/InvoicePage'
+import { searchCompany, fetchCrisisResponse, type TopicGroup, type PrecedentsData, type StrategyData, type InvoiceData } from './api'
+import { DEMO_DATA } from './data/demoData'
 
 export default function App() {
-  const [view, setView] = useState<'landing' | 'discovery' | 'strategy' | 'precedents' | 'drafts'>('landing')
+  const [view, setView] = useState<'landing' | 'discovery' | 'strategy' | 'precedents' | 'drafts' | 'invoice'>('landing')
   const [companyName, setCompanyName] = useState('')
   const [selectedTopic, setSelectedTopic] = useState<TopicGroup | null>(null)
   const [selectedStrategy, setSelectedStrategy] = useState<number>(0)
@@ -30,6 +32,13 @@ export default function App() {
   const [strategyLoading, setStrategyLoading] = useState(false)
   const [strategyError, setStrategyError] = useState<string | null>(null)
 
+  // Agent 5 data (invoice)
+  const [invoiceData, setInvoiceData] = useState<InvoiceData | null>(null)
+
+  // Demo mode
+  const isDemoMode = useRef(false)
+  const demoCompanyKey = useRef<string | null>(null)
+
   const handleSearch = useCallback((name: string, rect: DOMRect) => {
     setCompanyName(name)
     setInputRect(rect)
@@ -49,6 +58,19 @@ export default function App() {
         setSearchError(err instanceof Error ? err.message : 'Search failed')
         setIsLoading(false)
       })
+  }, [])
+
+  const handleDemoClick = useCallback((companyKey: string) => {
+    const demo = DEMO_DATA[companyKey]
+    if (!demo) return
+
+    isDemoMode.current = true
+    demoCompanyKey.current = companyKey
+    setCompanyName(demo.companyName)
+    setTopicGroups(demo.topicGroups)
+    setIsLoading(false)
+    setSearchError(null)
+    setView('discovery')
   }, [])
 
   useEffect(() => {
@@ -79,21 +101,40 @@ export default function App() {
     setPrecedentsError(null)
     setStrategyData(null)
     setStrategyError(null)
+    setInvoiceData(null)
+    isDemoMode.current = false
+    demoCompanyKey.current = null
   }, [])
 
   const handleRespondToTopic = useCallback((topic: TopicGroup) => {
     setSelectedTopic(topic)
     setView('strategy')
-    setStrategyData(null)
     setStrategyError(null)
-    setStrategyLoading(true)
-    setPrecedentsData(null)
     setPrecedentsError(null)
 
+    // Demo mode: load pre-cached data instantly
+    if (isDemoMode.current && demoCompanyKey.current) {
+      const demo = DEMO_DATA[demoCompanyKey.current]
+      const cached = demo?.topicResponses[topic.name]
+      if (cached) {
+        setStrategyData(cached.strategyData)
+        setPrecedentsData(cached.precedentsData)
+        setInvoiceData(cached.invoiceData)
+        setStrategyLoading(false)
+        return
+      }
+    }
+
+    // Normal API flow
+    setStrategyData(null)
+    setStrategyLoading(true)
+    setPrecedentsData(null)
+
     fetchCrisisResponse(companyName, topic)
-      .then(({ strategyData: sd, precedentsData: pd }) => {
+      .then(({ strategyData: sd, precedentsData: pd, invoiceData: id }) => {
         setStrategyData(sd)
         setPrecedentsData(pd)
+        setInvoiceData(id)
         setStrategyLoading(false)
       })
       .catch((err) => {
@@ -110,6 +151,7 @@ export default function App() {
     setPrecedentsError(null)
     setStrategyData(null)
     setStrategyError(null)
+    setInvoiceData(null)
   }, [])
 
   const handleViewDrafts = useCallback((strategyIndex: number) => {
@@ -121,6 +163,10 @@ export default function App() {
     // Precedents data is already loaded from the combined crisis-response call
     setPrecedentsLoading(false)
     setView('precedents')
+  }, [])
+
+  const handleViewInvoice = useCallback(() => {
+    setView('invoice')
   }, [])
 
   const handleBackToStrategy = useCallback(() => {
@@ -137,7 +183,7 @@ export default function App() {
             transition: 'opacity 0.6s ease-out, transform 0.6s ease-out',
           }}
         >
-          <LandingPage onSubmit={handleSearch} />
+          <LandingPage onSubmit={handleSearch} onDemoClick={handleDemoClick} />
         </div>
       )}
 
@@ -180,6 +226,7 @@ export default function App() {
           onBack={handleBackToDiscovery}
           onViewDrafts={handleViewDrafts}
           onSeeWhy={handleSeeWhy}
+          onViewInvoice={handleViewInvoice}
         />
       )}
 
@@ -200,6 +247,14 @@ export default function App() {
           topic={selectedTopic}
           strategyIndex={selectedStrategy}
           strategyData={strategyData}
+          onBack={handleBackToStrategy}
+        />
+      )}
+      {view === 'invoice' && selectedTopic && (
+        <InvoicePage
+          companyName={companyName}
+          topic={selectedTopic}
+          invoiceData={invoiceData}
           onBack={handleBackToStrategy}
         />
       )}

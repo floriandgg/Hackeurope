@@ -1,32 +1,30 @@
 import { useCallback, useRef, useState, type FormEvent, type MouseEvent } from 'react';
+import { DEMO_DATA } from '../data/demoData';
 
 interface LandingPageProps {
   onSubmit: (companyName: string, inputRect: DOMRect) => void;
+  onDemoClick: (companyKey: string) => void;
 }
 
-const PROJECTS = [
-  {
-    title: 'Data Breach Response',
-    industry: 'Technology',
-    metric: 94,
-    metricLabel: 'Sentiment Recovery',
-    time: '2.4 days',
-  },
-  {
-    title: 'Executive Crisis',
-    industry: 'Finance',
-    metric: 87,
-    metricLabel: 'Media Favorability',
-    time: '1.8 days',
-  },
-  {
-    title: 'Product Recall',
-    industry: 'Consumer',
-    metric: 91,
-    metricLabel: 'Brand Trust Score',
-    time: '3.1 days',
-  },
-];
+/* ─── Build demo card data from pre-cached DEMO_DATA ─── */
+
+const DEMO_COMPANIES: {
+  companyKey: string;
+  title: string;
+  topicCount: number;
+  alertLevel: string;
+  roiMultiplier: number;
+}[] = Object.entries(DEMO_DATA).map(([key, data]) => {
+  // Find the first topic with a strategy response to get alert level + ROI
+  const firstTopic = Object.values(data.topicResponses)[0];
+  return {
+    companyKey: key,
+    title: data.companyName,
+    topicCount: data.topicGroups.length,
+    alertLevel: firstTopic?.strategyData.alertLevel ?? 'MEDIUM',
+    roiMultiplier: firstTopic?.invoiceData?.roiMultiplier ?? 0,
+  };
+});
 
 const FAN_STYLES: React.CSSProperties[] = [
   { left: '25%', transform: 'translate(-60%, 20px) rotate(-8deg)', zIndex: 1 },
@@ -41,10 +39,12 @@ function TiltCard({
   children,
   className,
   style,
+  onClick,
 }: {
   children: React.ReactNode;
   className?: string;
   style?: React.CSSProperties;
+  onClick?: () => void;
 }) {
   const cardRef = useRef<HTMLDivElement>(null);
   const rafRef = useRef<number>(0);
@@ -78,7 +78,7 @@ function TiltCard({
   return (
     <div
       ref={cardRef}
-      className={className}
+      className={`${className ?? ''} ${onClick ? 'cursor-pointer' : ''}`}
       style={{
         ...style,
         perspective: '800px',
@@ -86,6 +86,7 @@ function TiltCard({
       }}
       onMouseMove={handleMouseMove}
       onMouseLeave={handleMouseLeave}
+      onClick={onClick}
     >
       <div
         className="w-full h-full bg-white rounded-2xl border border-mist p-6
@@ -105,38 +106,48 @@ function TiltCard({
   );
 }
 
-function CardContent({ project }: { project: (typeof PROJECTS)[number] }) {
+function getAlertColor(level: string) {
+  switch (level.toUpperCase()) {
+    case 'CRITICAL':
+      return { bg: 'bg-red-50', text: 'text-red-700', border: 'border-red-200/60', dot: 'bg-red-400' };
+    case 'MEDIUM':
+      return { bg: 'bg-amber-50', text: 'text-amber-700', border: 'border-amber-200/60', dot: 'bg-amber-400' };
+    case 'SOFT':
+      return { bg: 'bg-blue-50', text: 'text-blue-700', border: 'border-blue-200/60', dot: 'bg-blue-400' };
+    default:
+      return { bg: 'bg-gray-50', text: 'text-gray-600', border: 'border-gray-200/60', dot: 'bg-gray-400' };
+  }
+}
+
+function DemoCardContent({ company }: { company: (typeof DEMO_COMPANIES)[number] }) {
+  const alert = getAlertColor(company.alertLevel);
   return (
     <>
       <div className="flex items-center justify-between mb-5">
-        <span className="text-[11px] font-medium px-2.5 py-1 rounded-full bg-periwinkle/40 text-royal tracking-wide">
-          {project.industry}
+        <span className={`inline-flex items-center gap-1.5 text-[11px] font-semibold px-2.5 py-1 rounded-full border ${alert.bg} ${alert.border} ${alert.text}`}>
+          <span className={`w-1.5 h-1.5 rounded-full ${alert.dot}`} />
+          {company.alertLevel}
         </span>
-        <span className="text-[11px] font-medium text-steel flex items-center gap-1.5">
-          <span className="w-1.5 h-1.5 rounded-full bg-emerald-400" />
-          Resolved
+        <span className="text-[11px] font-medium text-royal bg-periwinkle/25 px-2.5 py-1 rounded-full">
+          {company.topicCount} topics
         </span>
       </div>
 
-      <h3 className="font-display text-lg text-charcoal mb-5">
-        {project.title}
+      <h3 className="font-display text-2xl text-charcoal mb-5">
+        {company.title}
       </h3>
 
-      <div className="text-5xl font-display text-royal mb-1">
-        {project.metric}
-        <span className="text-3xl">%</span>
-      </div>
-      <p className="text-sm text-storm mb-5">{project.metricLabel}</p>
+      {company.roiMultiplier > 0 && (
+        <>
+          <div className="text-5xl font-display text-royal mb-1" style={{ fontFeatureSettings: '"tnum"' }}>
+            {company.roiMultiplier.toLocaleString()}
+            <span className="text-3xl">&times;</span>
+          </div>
+          <p className="text-sm text-storm mb-5">ROI vs agency</p>
+        </>
+      )}
 
-      {/* Progress bar */}
-      <div className="w-full h-1.5 bg-mist rounded-full overflow-hidden mb-5">
-        <div
-          className="h-full bg-royal/50 rounded-full"
-          style={{ width: `${project.metric}%` }}
-        />
-      </div>
-
-      <div className="pt-4 border-t border-mist flex items-center gap-2 text-storm">
+      <div className="pt-4 border-t border-mist flex items-center gap-2 text-royal">
         <svg
           width="14"
           height="14"
@@ -147,16 +158,15 @@ function CardContent({ project }: { project: (typeof PROJECTS)[number] }) {
           strokeLinecap="round"
           strokeLinejoin="round"
         >
-          <circle cx="12" cy="12" r="10" />
-          <path d="M12 6v6l4 2" />
+          <path d="M5 12h14M12 5l7 7-7 7" />
         </svg>
-        <span className="text-xs">Resolved in {project.time}</span>
+        <span className="text-xs font-medium">View analysis</span>
       </div>
     </>
   );
 }
 
-export default function LandingPage({ onSubmit }: LandingPageProps) {
+export default function LandingPage({ onSubmit, onDemoClick }: LandingPageProps) {
   const [url, setUrl] = useState('');
   const formCardRef = useRef<HTMLDivElement>(null);
 
@@ -344,36 +354,38 @@ export default function LandingPage({ onSubmit }: LandingPageProps) {
             {/* 3D Spline model container — secondary element */}
           </div>
 
-          {/* ── Past Project Cards ── */}
+          {/* ── Demo Company Cards ── */}
           <section
             className="opacity-0 animate-fade-in-up w-full mt-24 mb-16"
             style={{ animationDelay: '800ms' }}
           >
             <p className="text-center text-xs font-body font-medium text-silver tracking-[0.2em] uppercase mb-12">
-              Recent Crisis Analyses
+              Your Past Responses
             </p>
 
             {/* Mobile / Tablet: scrollable row */}
             <div className="flex lg:hidden gap-5 overflow-x-auto px-6 pb-4 snap-x snap-mandatory scrollbar-hide">
-              {PROJECTS.map((project) => (
+              {DEMO_COMPANIES.map((company) => (
                 <TiltCard
-                  key={project.title}
+                  key={company.companyKey}
                   className="min-w-[270px] snap-center"
+                  onClick={() => onDemoClick(company.companyKey)}
                 >
-                  <CardContent project={project} />
+                  <DemoCardContent company={company} />
                 </TiltCard>
               ))}
             </div>
 
             {/* Desktop: fanned layout */}
             <div className="hidden lg:block relative mx-auto max-w-5xl h-[420px]">
-              {PROJECTS.map((project, i) => (
+              {DEMO_COMPANIES.map((company, i) => (
                 <TiltCard
-                  key={project.title}
+                  key={company.companyKey}
                   className="absolute w-[300px]"
                   style={FAN_STYLES[i]}
+                  onClick={() => onDemoClick(company.companyKey)}
                 >
-                  <CardContent project={project} />
+                  <DemoCardContent company={company} />
                 </TiltCard>
               ))}
             </div>

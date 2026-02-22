@@ -210,11 +210,15 @@ def scorer_node(state: GraphState) -> dict:
             api_compute_cost_eur=api_compute_cost_eur,
         )
 
+    # Estimate API cost: ~0.08 EUR per Gemini call per article
+    api_cost = len(enriched_articles) * 0.008 if enriched_articles else 0.0
+
     return {
         "articles": enriched_articles,
         "total_var_impact": total_var_impact,
         "estimated_financial_loss": estimated_financial_loss,
         "severity_score": max_severity,
+        "agent3_api_cost_eur": round(api_cost, 4),
     }
 
 
