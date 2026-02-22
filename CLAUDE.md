@@ -128,6 +128,8 @@ Backend (run from `backend/`):
 
 **Debug mode:** Add `?debug` to the frontend URL (e.g. `http://localhost:5173/?debug`) to bypass the backend and use mock data. Agent 1 mock delay: 2.5s, Agent 2+3+4+5 combined mock delay: 5s. Defined in `api.ts`.
 
+**Demo data:** Pre-cached API responses for 3 showcase companies (OpenAI, Tesla, Apple) stored in `frontend/src/data/raw/` as JSON files. Captured by `scripts/capture-demo-data.py` (requires backend running on localhost:8000, resume-friendly — skips existing files). `frontend/src/data/demoData.ts` imports the raw JSON at build time and transforms it using the same `transform*` functions as the live API path. Each company has a `*-search.json` (Agent 1 output) and `*-topic-N-crisis.json` files (Agent 2+3+4+5 combined output per topic). Currently: OpenAI (2 topics), Tesla (3 topics), Apple (3 topics).
+
 ### Frontend pages
 
 **User flow:** Landing page (company name input) → bubble transition → article discovery page (agent timeline + topic cards) → user picks a topic → expanded view with articles → "Respond to Topic" → strategy page (3 response strategies) → "See Why" → precedents page (historical case timeline) / "View Drafts" → draft viewer page (channel-specific response drafts) / "Cost Breakdown" → invoice page (ROI analysis, agency vs AI cost comparison).
