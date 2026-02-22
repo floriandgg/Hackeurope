@@ -111,10 +111,14 @@ class Agent1Output(BaseModel):
 class HistoricalCrisis(BaseModel):
     """A historical PR crisis case study."""
     company: str = Field(description="Name of the company that faced the similar crisis")
+    year: str = Field(default="", description="Year the crisis occurred, e.g. '2015'")
     crisis_summary: str = Field(description="One-sentence summary of the precedent")
+    crisis_title: str = Field(default="", description="Short crisis title, e.g. 'Emissions Scandal'")
+    crisis_type: str = Field(default="", description="Category: 'Product Safety', 'Data & Privacy', 'Regulatory & Governance', 'Reputation & Social', etc.")
     strategy_adopted: str = Field(description="PR action taken (e.g. 'Immediate apology', 'Denial', 'Legal attack')")
     outcome: str = Field(description="Final consequence (e.g. '15% stock drop', 'Scandal contained in 48h')")
     success_score: int = Field(ge=1, le=10, description="Score from 1 to 10 rating the strategy effectiveness")
+    lesson: str = Field(default="", description="Key lesson learned from this specific case")
     source_url: str = Field(default="", description="URL of the primary source article for this case")
 
 

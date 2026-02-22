@@ -246,7 +246,7 @@ interface ArticleDiscoveryPageProps {
   isLoading: boolean;
   searchError: string | null;
   onBack: () => void;
-  onRespondToTopic: (topic: { name: string; summary: string }) => void;
+  onRespondToTopic: (topic: TopicGroup) => void;
 }
 
 export default function ArticleDiscoveryPage({
@@ -699,7 +699,7 @@ function ExpandedContent({
 }: {
   topic: TopicGroup;
   onBack: () => void;
-  onRespond: (topic: { name: string; summary: string }) => void;
+  onRespond: (topic: TopicGroup) => void;
 }) {
   const urgency = Math.max(...topic.articles.map((a) => a.criticality));
   const urgencyStyle = getCriticalityStyle(urgency);
@@ -743,7 +743,7 @@ function ExpandedContent({
 
         {/* Respond to topic button */}
         <button
-          onClick={() => onRespond({ name: topic.name, summary: topic.summary })}
+          onClick={() => onRespond(topic)}
           className="inline-flex items-center gap-2 px-6 py-2.5 rounded-full
                      bg-royal text-white text-sm font-body font-medium
                      hover:bg-royal/90

@@ -40,12 +40,65 @@ export interface Article {
   summary: string;
   criticality: number;
   url: string;
+  subject: string;
+  severityScore: number;
 }
 
 export interface TopicGroup {
   name: string;
   summary: string;
   articles: Article[];
+}
+
+/* ─── Agent 2 types ─── */
+
+/** Single precedent case as returned by the backend */
+interface BackendPrecedent {
+  company: string;
+  year: string;
+  crisis_summary: string;
+  crisis_title: string;
+  crisis_type: string;
+  strategy_adopted: string;
+  outcome: string;
+  success_score: number;
+  lesson: string;
+  source_url: string;
+}
+
+/** Full response from POST /api/precedents */
+interface PrecedentsResponse {
+  precedents: BackendPrecedent[];
+  global_lesson: string;
+  confidence: string;
+}
+
+/** Article inside a PrecedentCase (for display) */
+export interface PrecedentArticle {
+  publisher: string;
+  title: string;
+  date: string;
+  url: string;
+}
+
+/** Frontend-ready precedent case */
+export interface PrecedentCase {
+  company: string;
+  year: string;
+  crisis: string;
+  crisisType: string;
+  strategy: string;
+  outcome: 'positive' | 'negative';
+  outcomeLabel: string;
+  lesson: string;
+  articles: PrecedentArticle[];
+}
+
+/** Entire Agent 2 result for the frontend */
+export interface PrecedentsData {
+  cases: PrecedentCase[];
+  globalLesson: string;
+  confidence: string;
 }
 
 /* ─── Helpers ─── */
@@ -132,7 +185,7 @@ function normalizeCriticality(exposureScore: number): number {
   return Math.max(1, Math.min(10, raw));
 }
 
-/* ─── Transform ─── */
+/* ─── Transform: Agent 1 ─── */
 
 function transformSubjects(subjects: BackendSubject[]): TopicGroup[] {
   return subjects.map((subj) => ({
@@ -145,11 +198,47 @@ function transformSubjects(subjects: BackendSubject[]): TopicGroup[] {
       summary: a.summary,
       criticality: normalizeCriticality(a.exposure_score),
       url: a.url,
+      subject: a.subject,
+      severityScore: a.severity_score,
     })),
   }));
 }
 
-/* ─── Debug mock data ─── */
+/* ─── Transform: Agent 2 ─── */
+
+function transformPrecedents(data: PrecedentsResponse): PrecedentsData {
+  const cases: PrecedentCase[] = data.precedents.map((p) => {
+    const articles: PrecedentArticle[] = [];
+    if (p.source_url) {
+      articles.push({
+        publisher: extractPublisher(p.source_url),
+        title: p.crisis_title || p.crisis_summary.slice(0, 60),
+        date: p.year || '',
+        url: p.source_url,
+      });
+    }
+
+    return {
+      company: p.company,
+      year: p.year || '',
+      crisis: p.crisis_title || p.crisis_summary.slice(0, 60),
+      crisisType: p.crisis_type || 'Corporate Crisis',
+      strategy: p.strategy_adopted,
+      outcome: p.success_score >= 6 ? 'positive' as const : 'negative' as const,
+      outcomeLabel: p.outcome,
+      lesson: p.lesson || p.crisis_summary,
+      articles,
+    };
+  });
+
+  return {
+    cases,
+    globalLesson: data.global_lesson,
+    confidence: data.confidence,
+  };
+}
+
+/* ─── Debug mock data: Agent 1 ─── */
 
 const MOCK_TOPICS: TopicGroup[] = [
   {
@@ -164,6 +253,8 @@ const MOCK_TOPICS: TopicGroup[] = [
         summary: 'Leaked audit documents reveal systemic data protection failures across multiple divisions.',
         criticality: 9,
         url: 'https://reuters.com/example',
+        subject: 'security_fraud',
+        severityScore: 4,
       },
       {
         publisher: 'TechCrunch',
@@ -172,6 +263,8 @@ const MOCK_TOPICS: TopicGroup[] = [
         summary: 'Independent researchers identify multiple unpatched vulnerabilities in flagship product.',
         criticality: 8,
         url: 'https://techcrunch.com/example',
+        subject: 'security_fraud',
+        severityScore: 4,
       },
       {
         publisher: 'Wired',
@@ -180,6 +273,8 @@ const MOCK_TOPICS: TopicGroup[] = [
         summary: 'Three board members step down over disagreements about AI deployment policies.',
         criticality: 6,
         url: 'https://wired.com/example',
+        subject: 'security_fraud',
+        severityScore: 3,
       },
     ],
   },
@@ -195,6 +290,8 @@ const MOCK_TOPICS: TopicGroup[] = [
         summary: 'Federal regulators open inquiry into potentially anticompetitive business practices.',
         criticality: 9,
         url: 'https://ft.com/example',
+        subject: 'legal_compliance',
+        severityScore: 4,
       },
       {
         publisher: 'The Wall Street Journal',
@@ -203,6 +300,8 @@ const MOCK_TOPICS: TopicGroup[] = [
         summary: 'Departure of two C-suite executives prompts investor concerns about stability.',
         criticality: 8,
         url: 'https://wsj.com/example',
+        subject: 'legal_compliance',
+        severityScore: 3,
       },
       {
         publisher: 'Bloomberg',
@@ -211,6 +310,8 @@ const MOCK_TOPICS: TopicGroup[] = [
         summary: 'Revenue missed consensus by 12%, marking the third disappointing quarter.',
         criticality: 7,
         url: 'https://bloomberg.com/example',
+        subject: 'legal_compliance',
+        severityScore: 3,
       },
       {
         publisher: 'Associated Press',
@@ -219,6 +320,8 @@ const MOCK_TOPICS: TopicGroup[] = [
         summary: 'Former employee files complaint citing OSHA violations and management negligence.',
         criticality: 7,
         url: 'https://apnews.com/example',
+        subject: 'legal_compliance',
+        severityScore: 3,
       },
     ],
   },
@@ -234,6 +337,8 @@ const MOCK_TOPICS: TopicGroup[] = [
         summary: 'Investigation documents repeated violations at three manufacturing facilities.',
         criticality: 6,
         url: 'https://theguardian.com/example',
+        subject: 'ethics_management',
+        severityScore: 3,
       },
       {
         publisher: 'CNBC',
@@ -242,6 +347,8 @@ const MOCK_TOPICS: TopicGroup[] = [
         summary: 'Key supplier bankruptcy creates uncertainty for product availability.',
         criticality: 5,
         url: 'https://cnbc.com/example',
+        subject: 'ethics_management',
+        severityScore: 2,
       },
       {
         publisher: 'The New York Times',
@@ -250,15 +357,86 @@ const MOCK_TOPICS: TopicGroup[] = [
         summary: 'Petition with 200K signatures demands reversal of recent price increases.',
         criticality: 5,
         url: 'https://nytimes.com/example',
+        subject: 'ethics_management',
+        severityScore: 2,
       },
     ],
   },
 ];
 
+/* ─── Debug mock data: Agent 2 ─── */
+
+const MOCK_PRECEDENTS: PrecedentsData = {
+  cases: [
+    {
+      company: 'Johnson & Johnson',
+      year: '1982',
+      crisis: 'Tylenol Tampering Crisis',
+      crisisType: 'Product Safety',
+      strategy: 'Full Transparency + Immediate Recall',
+      outcome: 'positive',
+      outcomeLabel: 'Market share recovered within 1 year',
+      lesson:
+        'Immediate recall and transparent communication established the gold standard for crisis response. Consumer trust was rebuilt through decisive, costly action that prioritized safety over short-term profits.',
+      articles: [
+        { publisher: 'Washington Post', title: 'J&J Pulls All Tylenol From Shelves Nationwide', date: 'Oct 5, 1982', url: '' },
+        { publisher: 'TIME', title: 'How Johnson & Johnson Saved Tylenol and Its Reputation', date: 'Oct 18, 1982', url: '' },
+      ],
+    },
+    {
+      company: 'Volkswagen',
+      year: '2015',
+      crisis: 'Emissions Scandal (Dieselgate)',
+      crisisType: 'Regulatory & Governance',
+      strategy: 'Initial Denial → Forced Admission',
+      outcome: 'negative',
+      outcomeLabel: '$30B+ in fines, CEO resigned',
+      lesson:
+        'Denial of factual evidence destroyed credibility with regulators and the public alike. Proactive disclosure before external investigation would have significantly limited financial and reputational damage.',
+      articles: [
+        { publisher: 'Reuters', title: 'VW Admits to Cheating U.S. Vehicle Emissions Tests', date: 'Sep 21, 2015', url: '' },
+        { publisher: 'Bloomberg', title: 'Volkswagen CEO Winterkorn Resigns Over Emissions Scandal', date: 'Sep 23, 2015', url: '' },
+      ],
+    },
+    {
+      company: 'Equifax',
+      year: '2017',
+      crisis: 'Massive Data Breach',
+      crisisType: 'Data & Privacy',
+      strategy: 'Delayed Response → Forced Transparency',
+      outcome: 'negative',
+      outcomeLabel: 'Stock dropped 35%, $700M settlement',
+      lesson:
+        'Six weeks of silence amplified public outrage exponentially. When the breach surfaced, the absence of a prepared response plan made the company appear negligent rather than victimized.',
+      articles: [
+        { publisher: 'The New York Times', title: 'Equifax Says Cyberattack May Have Affected 143 Million', date: 'Sep 7, 2017', url: '' },
+        { publisher: 'The Wall Street Journal', title: 'Equifax Breach Could Be Most Costly in Corporate History', date: 'Sep 12, 2017', url: '' },
+      ],
+    },
+    {
+      company: 'Starbucks',
+      year: '2018',
+      crisis: 'Racial Bias Incident',
+      crisisType: 'Reputation & Social',
+      strategy: 'Own It + Systemic Action',
+      outcome: 'positive',
+      outcomeLabel: 'Brand sentiment recovered in 3 months',
+      lesson:
+        'Closing 8,000 stores for racial bias training demonstrated commitment beyond words. The structural response — accepting material cost — outperformed any PR statement alone.',
+      articles: [
+        { publisher: 'CNN', title: 'Starbucks to Close All Stores for Racial-Bias Training', date: 'Apr 17, 2018', url: '' },
+        { publisher: 'The Guardian', title: 'Starbucks Anti-Bias Training: What Happened and What It Means', date: 'May 30, 2018', url: '' },
+      ],
+    },
+  ],
+  globalLesson: 'Companies that responded within 48 hours with full transparency recovered 3x faster than those that delayed or denied.',
+  confidence: 'high',
+};
+
 /** Debug mode: add ?debug to the URL to skip the backend and use mock data */
 const isDebug = typeof window !== 'undefined' && new URLSearchParams(window.location.search).has('debug');
 
-/* ─── API call ─── */
+/* ─── API calls ─── */
 
 export async function searchCompany(companyName: string): Promise<TopicGroup[]> {
   if (isDebug) {
@@ -280,4 +458,35 @@ export async function searchCompany(companyName: string): Promise<TopicGroup[]> 
 
   const data: SearchResponse = await res.json();
   return transformSubjects(data.subjects);
+}
+
+export async function fetchPrecedents(companyName: string, topic: TopicGroup): Promise<PrecedentsData> {
+  if (isDebug) {
+    await new Promise((r) => setTimeout(r, 4000));
+    console.log(`[DEBUG MODE] Returning mock precedents for "${topic.name}"`);
+    return MOCK_PRECEDENTS;
+  }
+
+  const res = await fetch('/api/precedents', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      company_name: companyName,
+      topic_name: topic.name,
+      topic_summary: topic.summary,
+      articles: topic.articles.map((a) => ({
+        title: a.title,
+        summary: a.summary,
+        subject: a.subject,
+        severity_score: a.severityScore,
+      })),
+    }),
+  });
+
+  if (!res.ok) {
+    throw new Error(`Precedents search failed: ${res.status} ${res.statusText}`);
+  }
+
+  const data: PrecedentsResponse = await res.json();
+  return transformPrecedents(data);
 }

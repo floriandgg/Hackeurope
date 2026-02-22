@@ -1,24 +1,7 @@
 import { useState, useEffect } from 'react';
+import type { PrecedentsData, PrecedentCase, PrecedentArticle } from '../api';
 
 /* ─── Types ─── */
-
-interface PrecedentArticle {
-  publisher: string;
-  title: string;
-  date: string;
-}
-
-interface PrecedentCase {
-  company: string;
-  year: string;
-  crisis: string;
-  crisisType: string;
-  strategy: string;
-  outcome: 'positive' | 'negative';
-  outcomeLabel: string;
-  lesson: string;
-  articles: PrecedentArticle[];
-}
 
 interface TopicInfo {
   name: string;
@@ -28,92 +11,35 @@ interface TopicInfo {
 interface PrecedentsPageProps {
   companyName: string;
   topic: TopicInfo;
+  precedentsData: PrecedentsData | null;
+  isLoading: boolean;
+  searchError: string | null;
   onBack: () => void;
 }
 
-/* ─── Mock Data ─── */
+/* ─── Agent Timeline Steps ─── */
 
 const PRECEDENT_AGENT_STEPS = [
   { label: 'Identifying crisis category', detail: 'Matching crisis type against historical database' },
-  { label: 'Scanning precedent database', detail: 'Searching 2,400+ documented corporate crises' },
+  { label: 'Scanning precedent database', detail: 'Searching documented corporate crises via Google' },
   { label: 'Ranking by similarity', detail: 'Scoring relevance across industry, scale, and type' },
   { label: 'Analyzing outcomes', detail: 'Evaluating response strategies and recovery timelines' },
   { label: 'Extracting key lessons', detail: 'Cross-referencing successful vs failed approaches' },
-  { label: 'Compiling precedent report', detail: '4 most relevant historical cases selected' },
+  { label: 'Compiling precedent report', detail: 'Most relevant historical cases selected' },
 ];
 
-const PRECEDENT_CASES: PrecedentCase[] = [
-  {
-    company: 'Johnson & Johnson',
-    year: '1982',
-    crisis: 'Tylenol Tampering Crisis',
-    crisisType: 'Product Safety',
-    strategy: 'Full Transparency + Immediate Recall',
-    outcome: 'positive',
-    outcomeLabel: 'Market share recovered within 1 year',
-    lesson:
-      'Immediate recall and transparent communication established the gold standard for crisis response. Consumer trust was rebuilt through decisive, costly action that prioritized safety over short-term profits.',
-    articles: [
-      { publisher: 'Washington Post', title: 'J&J Pulls All Tylenol From Shelves Nationwide', date: 'Oct 5, 1982' },
-      { publisher: 'TIME', title: 'How Johnson & Johnson Saved Tylenol and Its Reputation', date: 'Oct 18, 1982' },
-    ],
-  },
-  {
-    company: 'Volkswagen',
-    year: '2015',
-    crisis: 'Emissions Scandal (Dieselgate)',
-    crisisType: 'Regulatory & Governance',
-    strategy: 'Initial Denial → Forced Admission',
-    outcome: 'negative',
-    outcomeLabel: '$30B+ in fines, CEO resigned',
-    lesson:
-      'Denial of factual evidence destroyed credibility with regulators and the public alike. Proactive disclosure before external investigation would have significantly limited financial and reputational damage.',
-    articles: [
-      { publisher: 'Reuters', title: 'VW Admits to Cheating U.S. Vehicle Emissions Tests', date: 'Sep 21, 2015' },
-      { publisher: 'Bloomberg', title: 'Volkswagen CEO Winterkorn Resigns Over Emissions Scandal', date: 'Sep 23, 2015' },
-    ],
-  },
-  {
-    company: 'Equifax',
-    year: '2017',
-    crisis: 'Massive Data Breach',
-    crisisType: 'Data & Privacy',
-    strategy: 'Delayed Response → Forced Transparency',
-    outcome: 'negative',
-    outcomeLabel: 'Stock dropped 35%, $700M settlement',
-    lesson:
-      'Six weeks of silence amplified public outrage exponentially. When the breach surfaced, the absence of a prepared response plan made the company appear negligent rather than victimized.',
-    articles: [
-      { publisher: 'The New York Times', title: 'Equifax Says Cyberattack May Have Affected 143 Million', date: 'Sep 7, 2017' },
-      { publisher: 'The Wall Street Journal', title: 'Equifax Breach Could Be Most Costly in Corporate History', date: 'Sep 12, 2017' },
-    ],
-  },
-  {
-    company: 'Starbucks',
-    year: '2018',
-    crisis: 'Racial Bias Incident',
-    crisisType: 'Reputation & Social',
-    strategy: 'Own It + Systemic Action',
-    outcome: 'positive',
-    outcomeLabel: 'Brand sentiment recovered in 3 months',
-    lesson:
-      'Closing 8,000 stores for racial bias training demonstrated commitment beyond words. The structural response — accepting material cost — outperformed any PR statement alone.',
-    articles: [
-      { publisher: 'CNN', title: 'Starbucks to Close All Stores for Racial-Bias Training', date: 'Apr 17, 2018' },
-      { publisher: 'The Guardian', title: 'Starbucks Anti-Bias Training: What Happened and What It Means', date: 'May 30, 2018' },
-    ],
-  },
-];
-
-/* ─── Article Card (matches ArticleDiscoveryPage style) ─── */
+/* ─── Article Card ─── */
 
 function ArticleCard({ article }: { article: PrecedentArticle }) {
   const [hovered, setHovered] = useState(false);
+  const hasUrl = !!article.url;
+  const Tag = hasUrl ? 'a' : 'div';
 
   return (
-    <div
-      className="w-[195px] h-[160px] rounded-xl border p-4 cursor-default select-none
-                 flex flex-col transition-all duration-300"
+    <Tag
+      {...(hasUrl ? { href: article.url, target: '_blank', rel: 'noopener noreferrer' } : {})}
+      className={`w-[195px] h-[160px] rounded-xl border p-4 select-none
+                 flex flex-col transition-all duration-300 no-underline ${hasUrl ? 'cursor-pointer' : 'cursor-default'}`}
       style={{
         backgroundColor: '#ffffff',
         borderColor: hovered ? 'rgba(43,58,143,0.15)' : '#e8eaf0',
@@ -141,7 +67,7 @@ function ArticleCard({ article }: { article: PrecedentArticle }) {
       <span className="text-[10px] text-silver mt-2 shrink-0">
         {article.date}
       </span>
-    </div>
+    </Tag>
   );
 }
 
@@ -151,10 +77,12 @@ function PrecedentCaseCard({
   precedent,
   index,
   visible,
+  totalCases,
 }: {
   precedent: PrecedentCase;
   index: number;
   visible: boolean;
+  totalCases: number;
 }) {
   const isPositive = precedent.outcome === 'positive';
 
@@ -167,7 +95,7 @@ function PrecedentCaseCard({
         transition: `opacity 0.7s cubic-bezier(0.16,1,0.3,1) ${index * 80}ms, transform 0.7s cubic-bezier(0.16,1,0.3,1) ${index * 80}ms`,
       }}
     >
-      {/* ── Timeline node ── */}
+      {/* Timeline node */}
       <div className="flex flex-col items-center shrink-0 pt-2">
         <div
           className="w-3 h-3 rounded-full shrink-0"
@@ -178,7 +106,7 @@ function PrecedentCaseCard({
               : '0 0 8px rgba(239,68,68,0.35)',
           }}
         />
-        {index < PRECEDENT_CASES.length - 1 && (
+        {index < totalCases - 1 && (
           <div
             className="w-px flex-1 min-h-[40px]"
             style={{
@@ -188,7 +116,7 @@ function PrecedentCaseCard({
         )}
       </div>
 
-      {/* ── Case card ── */}
+      {/* Case card */}
       <div
         className="flex-1 rounded-2xl border p-6 mb-6 transition-all duration-300"
         style={{
@@ -287,16 +215,18 @@ function PrecedentCaseCard({
         </div>
 
         {/* Article cards */}
-        <div>
-          <span className="text-[10px] font-body font-medium text-silver tracking-[0.12em] uppercase mb-3 block">
-            Key Coverage
-          </span>
-          <div className="flex gap-3 flex-wrap">
-            {precedent.articles.map((article, i) => (
-              <ArticleCard key={i} article={article} />
-            ))}
+        {precedent.articles.length > 0 && (
+          <div>
+            <span className="text-[10px] font-body font-medium text-silver tracking-[0.12em] uppercase mb-3 block">
+              Key Coverage
+            </span>
+            <div className="flex gap-3 flex-wrap">
+              {precedent.articles.map((article, i) => (
+                <ArticleCard key={i} article={article} />
+              ))}
+            </div>
           </div>
-        </div>
+        )}
       </div>
     </div>
   );
@@ -307,6 +237,9 @@ function PrecedentCaseCard({
 export default function PrecedentsPage({
   companyName,
   topic,
+  precedentsData,
+  isLoading,
+  searchError,
   onBack,
 }: PrecedentsPageProps) {
   const [completedSteps, setCompletedSteps] = useState(0);
@@ -314,37 +247,65 @@ export default function PrecedentsPage({
   const [visibleCases, setVisibleCases] = useState(0);
   const [showSummary, setShowSummary] = useState(false);
 
+  // Effect 1: Animate steps 0–4 progressively while loading
   useEffect(() => {
     const timers: ReturnType<typeof setTimeout>[] = [];
 
-    PRECEDENT_AGENT_STEPS.forEach((_, i) => {
-      timers.push(setTimeout(() => setActiveStep(i), i * 650 + 300));
-      timers.push(
-        setTimeout(() => setCompletedSteps(i + 1), (i + 1) * 650 + 100),
-      );
-    });
-
-    PRECEDENT_CASES.forEach((_, i) => {
-      timers.push(setTimeout(() => setVisibleCases(i + 1), 1800 + i * 600));
-    });
-
-    timers.push(
-      setTimeout(
-        () => setShowSummary(true),
-        PRECEDENT_AGENT_STEPS.length * 650 + 400,
-      ),
-    );
+    if (isLoading) {
+      const stepsToAnimate = PRECEDENT_AGENT_STEPS.length - 1; // hold last step for data arrival
+      // Progressive delays matching Agent 2's ~30-60s runtime
+      const cumulativeDelays = [1000, 4000, 10000, 18000, 28000];
+      for (let i = 0; i < stepsToAnimate; i++) {
+        const delay = cumulativeDelays[i] ?? (i + 1) * 6000;
+        timers.push(setTimeout(() => setActiveStep(i), delay));
+        timers.push(setTimeout(() => setCompletedSteps(i + 1), delay + 600));
+      }
+    }
 
     return () => timers.forEach(clearTimeout);
-  }, []);
+  }, [isLoading]);
 
-  const positiveCount = PRECEDENT_CASES.filter((c) => c.outcome === 'positive').length;
-  const negativeCount = PRECEDENT_CASES.filter((c) => c.outcome === 'negative').length;
-  const totalCases = PRECEDENT_CASES.length;
+  // Effect 2: When data arrives, complete last step and reveal cases
+  useEffect(() => {
+    if (!isLoading && precedentsData && precedentsData.cases.length > 0) {
+      const timers: ReturnType<typeof setTimeout>[] = [];
+      const cases = precedentsData.cases;
+
+      // Complete final agent step
+      timers.push(setTimeout(() => setActiveStep(PRECEDENT_AGENT_STEPS.length - 1), 100));
+      timers.push(setTimeout(() => setCompletedSteps(PRECEDENT_AGENT_STEPS.length), 400));
+
+      // Stagger-reveal cases (adaptive timing)
+      const stagger = cases.length <= 3 ? 600 : cases.length <= 5 ? 500 : 400;
+      cases.forEach((_, i) => {
+        timers.push(setTimeout(() => setVisibleCases(i + 1), 600 + i * stagger));
+      });
+
+      // Show summary after all cases revealed
+      timers.push(
+        setTimeout(
+          () => setShowSummary(true),
+          600 + cases.length * stagger + 300,
+        ),
+      );
+
+      return () => timers.forEach(clearTimeout);
+    }
+  }, [isLoading, precedentsData]);
+
+  const cases = precedentsData?.cases ?? [];
+  const positiveCount = cases.filter((c) => c.outcome === 'positive').length;
+  const negativeCount = cases.filter((c) => c.outcome === 'negative').length;
+
+  const confidenceLabel = precedentsData?.confidence === 'high'
+    ? 'High confidence'
+    : precedentsData?.confidence === 'medium'
+    ? 'Medium confidence'
+    : 'Low confidence';
 
   return (
     <div className="relative min-h-screen overflow-hidden bg-white">
-      {/* ─── Background (matches other pages) ─── */}
+      {/* Background */}
       <div className="fixed inset-0 bg-gradient-to-b from-white via-[#f4f6fb] to-[#eceef4]" />
       <div
         className="fixed top-[-20%] left-1/2 -translate-x-1/2 w-[1000px] h-[800px] rounded-full
@@ -352,9 +313,9 @@ export default function PrecedentsPage({
                    animate-pulse-glow pointer-events-none"
       />
 
-      {/* ─── Content ─── */}
+      {/* Content */}
       <div className="relative z-10 h-screen flex flex-col">
-        {/* ── Nav ── */}
+        {/* Nav */}
         <nav
           className="w-full px-6 lg:px-12 py-5 flex items-center justify-between shrink-0
                      opacity-0 animate-fade-in"
@@ -412,9 +373,9 @@ export default function PrecedentsPage({
           </div>
         </nav>
 
-        {/* ── Split View ── */}
+        {/* Split View */}
         <div className="flex-1 flex flex-col lg:flex-row min-h-0">
-          {/* ── Left Panel: Agent Activity ── */}
+          {/* Left Panel: Agent Activity */}
           <aside
             className="w-full lg:w-[300px] lg:min-w-[300px] shrink-0
                        border-b lg:border-b-0 lg:border-r border-mist/60
@@ -516,14 +477,14 @@ export default function PrecedentsPage({
                   </div>
                   <div className="grid grid-cols-2 gap-3">
                     <div>
-                      <p className="text-2xl font-display text-royal">2,400+</p>
+                      <p className="text-2xl font-display text-royal">{confidenceLabel}</p>
                       <p className="text-[10px] text-storm mt-0.5">
-                        Cases Searched
+                        Source Quality
                       </p>
                     </div>
                     <div>
                       <p className="text-2xl font-display text-royal">
-                        {totalCases}
+                        {cases.length}
                       </p>
                       <p className="text-[10px] text-storm mt-0.5">
                         Relevant Matches
@@ -535,7 +496,7 @@ export default function PrecedentsPage({
             </div>
           </aside>
 
-          {/* ── Right Panel: Main Content ── */}
+          {/* Right Panel: Main Content */}
           <main
             className="flex-1 flex flex-col items-center px-6 lg:px-10 py-8 min-h-0 overflow-y-auto
                        opacity-0 animate-fade-in-up"
@@ -575,29 +536,58 @@ export default function PrecedentsPage({
               </p>
             </div>
 
-            {/* Outcome legend */}
-            <div
-              className="flex items-center justify-center gap-6 mb-8 shrink-0 opacity-0 animate-fade-in"
-              style={{ animationDelay: '500ms' }}
-            >
-              <div className="flex items-center gap-2">
-                <span className="w-2.5 h-2.5 rounded-full bg-emerald-400" />
-                <span className="text-[11px] font-body text-storm">
-                  Recovered ({positiveCount})
-                </span>
+            {/* Error state */}
+            {searchError && (
+              <div className="flex flex-col items-center justify-center gap-3 text-sm pt-8">
+                <p className="text-red-600 font-medium">Something went wrong</p>
+                <p className="text-storm">{searchError}</p>
+                <button
+                  onClick={onBack}
+                  className="mt-2 px-5 py-2 rounded-full border border-silver/30 text-storm text-sm hover:text-charcoal transition-colors"
+                >
+                  Back to Strategy
+                </button>
               </div>
-              <div className="flex items-center gap-2">
-                <span className="w-2.5 h-2.5 rounded-full bg-red-400" />
-                <span className="text-[11px] font-body text-storm">
-                  Damaged ({negativeCount})
-                </span>
-              </div>
-            </div>
+            )}
 
-            {/* ── Timeline ── */}
+            {/* Empty state (no results, not loading, no error) */}
+            {!isLoading && !searchError && precedentsData && cases.length === 0 && (
+              <div className="flex flex-col items-center justify-center gap-3 text-sm text-storm pt-8">
+                <p>No historical precedents found for this crisis type.</p>
+                <button
+                  onClick={onBack}
+                  className="mt-2 px-5 py-2 rounded-full border border-silver/30 text-storm text-sm hover:text-charcoal transition-colors"
+                >
+                  Back to Strategy
+                </button>
+              </div>
+            )}
+
+            {/* Outcome legend (only show when we have data) */}
+            {cases.length > 0 && (
+              <div
+                className="flex items-center justify-center gap-6 mb-8 shrink-0 opacity-0 animate-fade-in"
+                style={{ animationDelay: '500ms' }}
+              >
+                <div className="flex items-center gap-2">
+                  <span className="w-2.5 h-2.5 rounded-full bg-emerald-400" />
+                  <span className="text-[11px] font-body text-storm">
+                    Recovered ({positiveCount})
+                  </span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <span className="w-2.5 h-2.5 rounded-full bg-red-400" />
+                  <span className="text-[11px] font-body text-storm">
+                    Damaged ({negativeCount})
+                  </span>
+                </div>
+              </div>
+            )}
+
+            {/* Timeline */}
             <div className="w-full max-w-2xl">
-              {/* Loading state */}
-              {visibleCases === 0 && (
+              {/* Loading spinner */}
+              {visibleCases === 0 && !searchError && !(!isLoading && precedentsData && cases.length === 0) && (
                 <div className="flex items-center justify-center gap-3 text-sm text-storm pt-8">
                   <svg
                     className="animate-spin w-4 h-4 text-royal"
@@ -625,17 +615,18 @@ export default function PrecedentsPage({
               )}
 
               {/* Cases on timeline */}
-              {PRECEDENT_CASES.map((precedent, i) => (
+              {cases.map((precedent, i) => (
                 <PrecedentCaseCard
                   key={i}
                   precedent={precedent}
                   index={i}
                   visible={i < visibleCases}
+                  totalCases={cases.length}
                 />
               ))}
 
               {/* Key insight after all visible */}
-              {visibleCases >= PRECEDENT_CASES.length && (
+              {visibleCases >= cases.length && cases.length > 0 && (
                 <div
                   className="mt-4 mb-8 p-5 rounded-xl bg-white/80 border border-mist
                              shadow-[0_2px_12px_rgba(0,0,0,0.03)] text-center
@@ -646,8 +637,7 @@ export default function PrecedentsPage({
                     Key Insight
                   </p>
                   <p className="text-[14px] font-display italic text-charcoal leading-relaxed max-w-md mx-auto">
-                    Companies that responded within 48 hours with full transparency recovered 3× faster
-                    than those that delayed or denied.
+                    {precedentsData?.globalLesson}
                   </p>
                 </div>
               )}

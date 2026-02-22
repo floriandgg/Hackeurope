@@ -24,6 +24,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 
 from src.agents.agent_1_watcher.node import watcher_node
+from src.agents.agent_2_precedents.node import precedents_node_from_topic
 
 app = FastAPI(title="Crisis PR Agent API")
 
@@ -54,4 +55,27 @@ def search(req: SearchRequest):
         "company_name": req.company_name,
         "crisis_id": state.get("crisis_id", ""),
         "subjects": subjects,
+    }
+
+
+class PrecedentsRequest(BaseModel):
+    company_name: str
+    topic_name: str
+    topic_summary: str
+    articles: list[dict] = []
+
+
+@app.post("/api/precedents")
+def precedents(req: PrecedentsRequest):
+    """Run Agent 2 for a specific topic and return historical precedents."""
+    result = precedents_node_from_topic(
+        company_name=req.company_name,
+        topic_name=req.topic_name,
+        topic_summary=req.topic_summary,
+        articles=req.articles,
+    )
+    return {
+        "precedents": result["precedents"],
+        "global_lesson": result["global_lesson"],
+        "confidence": result["confidence"],
     }

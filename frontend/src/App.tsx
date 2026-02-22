@@ -4,17 +4,12 @@ import ArticleDiscoveryPage from './components/ArticleDiscoveryPage'
 import StrategyPage from './components/StrategyPage'
 import PrecedentsPage from './components/PrecedentsPage'
 import DraftViewerPage from './components/DraftViewerPage'
-import { searchCompany, type TopicGroup } from './api'
-
-interface TopicInfo {
-  name: string;
-  summary: string;
-}
+import { searchCompany, fetchPrecedents, type TopicGroup, type PrecedentsData } from './api'
 
 export default function App() {
   const [view, setView] = useState<'landing' | 'discovery' | 'strategy' | 'precedents' | 'drafts'>('landing')
   const [companyName, setCompanyName] = useState('')
-  const [selectedTopic, setSelectedTopic] = useState<TopicInfo | null>(null)
+  const [selectedTopic, setSelectedTopic] = useState<TopicGroup | null>(null)
   const [selectedStrategy, setSelectedStrategy] = useState<number>(0)
   const [isTransitioning, setIsTransitioning] = useState(false)
   const [inputRect, setInputRect] = useState<DOMRect | null>(null)
@@ -24,6 +19,11 @@ export default function App() {
   const [topicGroups, setTopicGroups] = useState<TopicGroup[]>([])
   const [isLoading, setIsLoading] = useState(false)
   const [searchError, setSearchError] = useState<string | null>(null)
+
+  // Agent 2 data
+  const [precedentsData, setPrecedentsData] = useState<PrecedentsData | null>(null)
+  const [precedentsLoading, setPrecedentsLoading] = useState(false)
+  const [precedentsError, setPrecedentsError] = useState<string | null>(null)
 
   const handleSearch = useCallback((name: string, rect: DOMRect) => {
     setCompanyName(name)
@@ -70,9 +70,11 @@ export default function App() {
     setView('landing')
     setCompanyName('')
     setSelectedTopic(null)
+    setPrecedentsData(null)
+    setPrecedentsError(null)
   }, [])
 
-  const handleRespondToTopic = useCallback((topic: TopicInfo) => {
+  const handleRespondToTopic = useCallback((topic: TopicGroup) => {
     setSelectedTopic(topic)
     setView('strategy')
   }, [])
@@ -80,6 +82,8 @@ export default function App() {
   const handleBackToDiscovery = useCallback(() => {
     setView('discovery')
     setSelectedTopic(null)
+    setPrecedentsData(null)
+    setPrecedentsError(null)
   }, [])
 
   const handleViewDrafts = useCallback((strategyIndex: number) => {
@@ -88,8 +92,23 @@ export default function App() {
   }, [])
 
   const handleSeeWhy = useCallback(() => {
+    if (!selectedTopic) return
+    setPrecedentsData(null)
+    setPrecedentsError(null)
+    setPrecedentsLoading(true)
     setView('precedents')
-  }, [])
+
+    fetchPrecedents(companyName, selectedTopic)
+      .then((data) => {
+        setPrecedentsData(data)
+        setPrecedentsLoading(false)
+      })
+      .catch((err) => {
+        console.error('Precedents fetch failed:', err)
+        setPrecedentsError(err instanceof Error ? err.message : 'Failed to load precedents')
+        setPrecedentsLoading(false)
+      })
+  }, [companyName, selectedTopic])
 
   const handleBackToStrategy = useCallback(() => {
     setView('strategy')
@@ -152,6 +171,9 @@ export default function App() {
         <PrecedentsPage
           companyName={companyName}
           topic={selectedTopic}
+          precedentsData={precedentsData}
+          isLoading={precedentsLoading}
+          searchError={precedentsError}
           onBack={handleBackToStrategy}
         />
       )}

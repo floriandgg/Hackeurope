@@ -9,7 +9,10 @@ to show ROI (invoiced value vs actual cost).
 import os
 import uuid
 from pathlib import Path
-from paid import Paid
+try:
+    from paid import Paid
+except ImportError:
+    Paid = None  # type: ignore[assignment,misc]
 from dotenv import load_dotenv
 
 # Load .env (cwd, backend/, project root)
@@ -20,7 +23,7 @@ load_dotenv(_env_cwd) or load_dotenv(_env_backend) or load_dotenv(_env_root)
 
 # Paid client initialization
 PAID_API_KEY = os.getenv("PAID_API_KEY")
-paid_client = Paid(token=PAID_API_KEY) if PAID_API_KEY else None
+paid_client = Paid(token=PAID_API_KEY) if (Paid is not None and PAID_API_KEY) else None
 
 # Product constants
 EXTERNAL_PRODUCT_ID = "pr-crisis-swarm-001"

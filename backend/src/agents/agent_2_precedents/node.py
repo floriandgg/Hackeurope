@@ -335,13 +335,18 @@ the current crisis above. Aim for diversity — different industries, strategies
 
 For each case you MUST provide:
 1. **company**: The real company name (must be mentioned in the research above)
-2. **crisis_summary**: One factual sentence about what happened
-3. **strategy_adopted**: The EXACT communication/PR strategy deployed (be very specific: \
+2. **year**: The year the crisis occurred (e.g. "2015")
+3. **crisis_summary**: One factual sentence about what happened
+4. **crisis_title**: Short title for the crisis (e.g. "Emissions Scandal", "Data Breach")
+5. **crisis_type**: Category — one of: "Product Safety", "Data & Privacy", "Regulatory & Governance", \
+   "Reputation & Social", "Financial & Fraud", "Environmental", "Labor & Ethics"
+6. **strategy_adopted**: The EXACT communication/PR strategy deployed (be very specific: \
    e.g. "CEO issued public apology within 24h and pledged $500M to victims" not just "apology")
-4. **outcome**: Measurable result with numbers when available \
+7. **outcome**: Measurable result with numbers when available \
    (e.g. "Stock dropped 15% in 48h, recovered within 6 months" or "Lost 40% of customer base")
-5. **success_score**: 1-10 rating (1=catastrophic failure, 5=mixed, 10=textbook crisis management)
-6. **source_url**: The URL of the primary article or source you used for this case (must be from the research)
+8. **success_score**: 1-10 rating (1=catastrophic failure, 5=mixed, 10=textbook crisis management)
+9. **lesson**: One sentence describing the key lesson from this specific case
+10. **source_url**: The URL of the primary article or source you used for this case (must be from the research)
 
 Also provide:
 - **global_lesson**: ONE strategic sentence synthesizing the key takeaway across all cases
@@ -396,10 +401,14 @@ def _match_sources_to_cases(
             best_url = f"https://www.google.com/search?q={case.company.replace(' ', '+')}+crisis+case+study"
         updated.append(HistoricalCrisis(
             company=case.company,
+            year=case.year,
             crisis_summary=case.crisis_summary,
+            crisis_title=case.crisis_title,
+            crisis_type=case.crisis_type,
             strategy_adopted=case.strategy_adopted,
             outcome=case.outcome,
             success_score=case.success_score,
+            lesson=case.lesson,
             source_url=best_url,
         ))
     return updated
@@ -617,3 +626,115 @@ def _run_pipeline(
         "agent2_sources": sources,
         "agent2_api_cost_eur": round(api_cost, 4),
     }
+
+
+# ---------------------------------------------------------------------------
+# Standalone entry point — called from the API without a full GraphState
+# ---------------------------------------------------------------------------
+
+def precedents_node_from_topic(
+    company_name: str,
+    topic_name: str,
+    topic_summary: str,
+    articles: list[dict],
+) -> dict[str, Any]:
+    """
+    Run Agent 2 for a single user-selected topic.
+
+    Builds an Agent1Output from the provided topic data (no GraphState),
+    then runs grounded research (step 2.2) and extract+verify (step 2.3).
+    Returns the same dict structure as precedents_node.
+    """
+    t0 = time.time()
+
+    try:
+        # Build Agent1Output from topic data
+        article_details: list[ArticleDetail] = []
+        max_severity = 1
+        for a in articles:
+            sev = a.get("severity_score") or a.get("severityScore") or 3
+            article_details.append(ArticleDetail(
+                title=a.get("title", ""),
+                summary=a.get("summary") or a.get("title", ""),
+                severity_score=min(max(int(sev), 1), 5),
+                subject=a.get("subject", ""),
+            ))
+            max_severity = max(max_severity, min(max(int(sev), 1), 5))
+
+        # Build a structured summary from articles
+        summary_parts = [f"Topic: {topic_name} — {topic_summary}"]
+        for i, ad in enumerate(article_details[:10], 1):
+            subj_display = SUBJECT_DISPLAY_NAMES.get(ad.subject, ad.subject)
+            summary_parts.append(
+                f"Article {i} [{subj_display}, severity {ad.severity_score}/5]: {ad.summary}"
+            )
+        crisis_summary = "\n".join(summary_parts)
+
+        agent1_output = Agent1Output(
+            company_name=company_name,
+            crisis_summary=crisis_summary,
+            severity_score=max_severity,
+            primary_threat_category=topic_name,
+            articles=article_details,
+        )
+
+        print(f"[AGENT 2] Topic-based run for: {company_name} / {topic_name}")
+        print(f"[AGENT 2] Severity: {max_severity}/5, Articles: {len(article_details)}")
+
+        # Step 2.2: Grounded Research
+        print("\n[AGENT 2] === Step 2.2: Grounded Research (3 searches) ===")
+        research, sources = _run_grounded_research(agent1_output)
+
+        if all(len(v) < 100 for v in research.values()):
+            print("[AGENT 2] WARNING: All searches returned minimal results.")
+            return {
+                "precedents": [],
+                "global_lesson": "No relevant historical precedents found for this crisis type.",
+                "confidence": "low",
+            }
+
+        # Step 2.3: Extract & Verify
+        print("\n[AGENT 2] === Step 2.3: Extract & Verify ===")
+        output: Agent2Output = _extract_and_verify(research, crisis_summary, sources)
+
+        # Source-quality-driven confidence
+        total_chars = sum(len(v) for v in research.values())
+        num_sources = len(sources)
+        if total_chars >= 10000 and num_sources >= 10:
+            source_confidence = "high"
+        elif total_chars >= 3000 and num_sources >= 4:
+            source_confidence = "medium"
+        else:
+            source_confidence = "low"
+
+        confidence_rank = {"low": 0, "medium": 1, "high": 2}
+        final_confidence = min(
+            confidence_rank.get(output.confidence, 1),
+            confidence_rank.get(source_confidence, 1),
+        )
+        confidence_label = {0: "low", 1: "medium", 2: "high"}[final_confidence]
+
+        elapsed = time.time() - t0
+        past_cases_dicts = [c.model_dump() for c in output.past_cases]
+
+        print(f"\n[AGENT 2] Done in {elapsed:.1f}s")
+        print(f"[AGENT 2] Cases: {len(past_cases_dicts)} | Confidence: {confidence_label}")
+        for case in output.past_cases:
+            print(f"[AGENT 2]   -> {case.company} (score: {case.success_score}/10)")
+        print(f"[AGENT 2]   Lesson: {output.global_lesson}")
+
+        return {
+            "precedents": past_cases_dicts,
+            "global_lesson": output.global_lesson,
+            "confidence": confidence_label,
+        }
+
+    except Exception as e:
+        elapsed = time.time() - t0
+        print(f"[AGENT 2] CRITICAL ERROR after {elapsed:.1f}s: {e}")
+        traceback.print_exc()
+        return {
+            "precedents": [],
+            "global_lesson": "Analysis could not be completed due to a technical error.",
+            "confidence": "low",
+        }
