@@ -7,16 +7,15 @@ Sets customer_id and crisis_id for Paid.ai (Agents 2, 3, 4).
 """
 import time
 import uuid
-from concurrent.futures import ThreadPoolExecutor, as_completed
 from datetime import datetime
 from dateutil import parser as date_parser
 
 from src.graph.state import GraphState
 from src.clients.tavily_client import tavily_client, search_news
-from src.clients.jina_client import get_markdown_content
 from src.clients.llm_client import llm
 from src.shared.types import (
     ArticleScores,
+    ArticleClusteringResult,
     ParagraphDecisions,
     SUBJECT_KEYS,
     SUBJECT_DISPLAY_NAMES,
@@ -137,6 +136,35 @@ def _get_risk_multiplier(subject: str) -> float:
     return SUBJECT_RISK_MULTIPLIERS.get(subject.strip().lower(), 1.0)
 
 
+# Noise patterns that often appear in off-topic search results
+_TITLE_BLACKLIST = (
+    "refinery",
+    "kazakhstan",
+    "warner bros",
+    "stock market overview",
+    "market roundup",
+    "daily digest",
+)
+
+
+def _validate_result(article_title: str, company_name: str) -> bool:
+    """
+    Pre-filter: reject articles that don't mention the company or match known noise.
+    Saves Jina/Gemini calls for clearly irrelevant results.
+    """
+    if not article_title or not company_name:
+        return False
+    title_lower = article_title.lower()
+    company_lower = company_name.lower()
+    # 1. Company name must appear in title
+    if company_lower not in title_lower:
+        return False
+    # 2. Blacklist noisy patterns
+    if any(word in title_lower for word in _TITLE_BLACKLIST):
+        return False
+    return True
+
+
 def _analyze_article_with_gemini(
     title: str, content: str, url: str, company_name: str
 ) -> ArticleScores | None:
@@ -152,23 +180,27 @@ The company we are monitoring is: {company_name}
 For this article, provide:
 1. **is_substantive_article**: True ONLY if this is a real news article PRIMARILY about {company_name}. Set to False if: the article is about a different company (e.g. Alibaba when we search for Amazon), a newsletter signup page, promotional content, or mostly navigation/footer boilerplate (e.g. "Sign up for our newsletters", "Related Articles", "Subscribe and interact").
 2. **summary**: A concise summary in 1-3 sentences (max 300 chars). Get to the point.
-3. **subject**: One of these EXACT keys (write exactly): security_fraud, legal_compliance, ethics_management, product_bug, customer_service
+3. **subject**: Use the MOST SPECIFIC category. One of: security_fraud, legal_compliance, ethics_management, labor_relations, financial_performance, operational_incident, product_bug, customer_service
    - security_fraud: fraud, data breach, security flaw
-   - legal_compliance: lawsuit, fine, legal issue
-   - ethics_management: greenwashing, bad management, values
+   - legal_compliance: lawsuit, fine, regulatory action
+   - ethics_management: greenwashing, values, governance (NOT layoffs)
+   - labor_relations: layoffs, job cuts, workforce reduction, labor disputes
+   - financial_performance: stock drop, earnings miss, market impact
+   - operational_incident: outage, system failure, supply chain disruption
    - product_bug: product defect, technical failure
    - customer_service: customer complaint, after-sales
 4. **author**: Author name if visible in the excerpt, else empty string
 5. **authority_score**: Score 1-5 by source (5=international, 4=national, 3=specialized, 2=blog, 1=unknown)
 6. **severity_score**: Score 1-5 by severity (1=mild criticism, 2=ethical, 3=legal, 4=scandal, 5=criminal)
 7. **sentiment**: One of: negative (critical/unfavorable), neutral (balanced/factual), positive (favorable/promotional)
+8. **sub_theme**: A short 2-6 word phrase for the SPECIFIC angle or focus of this article. INVENT a distinct sub-theme to differentiate it (e.g. "Layoff email blunder", "Mass job cuts scale", "CEO documentary backlash", "Employee communication mishap"). Use varied angles so articles don't all get the same sub_theme.
 
 Article:
 Title: {title}
 URL: {url}
 Excerpt: {content}
 
-Respond with is_substantive_article, summary, subject, author, authority_score, severity_score and sentiment.
+Respond with is_substantive_article, summary, subject, sub_theme, author, authority_score, severity_score and sentiment.
 """.format(
         company_name=company_name or "the company",
         title=title[:200],
@@ -182,93 +214,92 @@ Respond with is_substantive_article, summary, subject, author, authority_score, 
         return None
 
 
-def _process_single_article(r: dict, company_name: str = "") -> dict | None:
-    """Process one Tavily result: fetch content, analyze with Gemini, score.
-    Returns article dict or None if skipped."""
-    title = r.get("title", "")
-    url = r.get("url", "")
-    pub_date = r.get("pub_date")
-
-    content_from_jina = get_markdown_content(url)
-    if content_from_jina and len(content_from_jina.strip()) > 100:
-        content = content_from_jina
-    else:
-        content = r.get("content", "") or ""
-        content = _filter_content_to_article(title, content)
-
-    if _is_likely_paywalled(content):
-        print(f"[AGENT 1] Skipped (paywall): {title[:60]}...")
+def _cluster_articles_with_gemini(articles: list[dict], max_per_cluster: int = 3) -> list[dict] | None:
+    """
+    Single Gemini call: groups all articles into thematic clusters (max 3 per cluster).
+    Returns a list of {title, articles} dicts, or None on failure (caller falls back).
+    """
+    if not llm or len(articles) <= 1:
         return None
 
-    _title_lower = title.lower()
-    if any(x in _title_lower for x in ("sign up for", "newsletter", "get our newsletter", "subscribe to our")):
-        print(f"[AGENT 1] Skipped (newsletter/promo): {title[:60]}...")
-        return None
-
-    scores = _analyze_article_with_gemini(title, content, url, company_name)
-    if scores is None:
-        summary = (content or "")[:300] if content else title
-        subject = "ethics_management"
-        author = ""
-        authority_score = 3
-        severity_score = 2
-        sentiment = "neutral"
-    elif not getattr(scores, "is_substantive_article", True):
-        print(f"[AGENT 1] Skipped (not substantive): {title[:60]}...")
-        return None
-    else:
-        summary = (scores.summary or content or title)[:300]
-        subject = scores.subject if scores.subject in SUBJECT_KEYS else "ethics_management"
-        author = (scores.author or "").strip()[:200]
-        authority_score = scores.authority_score
-        severity_score = scores.severity_score
-        sentiment = getattr(scores, "sentiment", "neutral") or "neutral"
-        sentiment = sentiment.lower().strip()
-        if sentiment not in SENTIMENT_WEIGHTS:
-            sentiment = "neutral"
-
-    recency_mult = _recency_multiplier(pub_date)
-    risk_mult = _get_risk_multiplier(subject)
-    sentiment_weight = SENTIMENT_WEIGHTS.get(sentiment, 0.5)
-    exposure_score = (
-        (authority_score * severity_score)
-        * risk_mult
-        * recency_mult
-        * sentiment_weight
+    structured_llm = llm.with_structured_output(ArticleClusteringResult)
+    numbered = "\n".join(
+        f"[{i}] {a.get('title', '')} — {(a.get('summary') or '')[:120]}"
+        for i, a in enumerate(articles)
     )
+    n = len(articles)
+    prompt = f"""You have {n} news articles about the same company. Group them into thematic clusters where each cluster shares a meaningful crisis angle.
 
-    return {
-        "title": title,
-        "summary": summary,
-        "url": url,
-        "content": content,
-        "pub_date": pub_date,
-        "author": author,
-        "subject": subject,
-        "sentiment": sentiment,
-        "authority_score": authority_score,
-        "severity_score": severity_score,
-        "recency_multiplier": recency_mult,
-        "exposure_score": round(exposure_score, 2),
-    }
+Rules:
+- Maximum {max_per_cluster} articles per cluster.
+- Every article must appear in exactly one cluster.
+- Give each cluster a short, specific 2-5 word title (e.g. "Layoff Email Blunder", "Mass Job Cuts Scale", "CEO Priorities Backlash").
+- Articles covering genuinely different angles should be in different clusters.
+
+Articles:
+{numbered}
+
+Return the clusters with their titles and the article indices (0-based) they contain."""
+    try:
+        result = structured_llm.invoke(prompt)
+        # Validate: every index appears exactly once
+        seen = set()
+        clusters_out = []
+        for cluster in result.clusters:
+            valid_idx = [i for i in cluster.article_indices if 0 <= i < n and i not in seen]
+            seen.update(valid_idx)
+            if valid_idx:
+                chunk_articles = [articles[i] for i in valid_idx]
+                top = max(chunk_articles, key=lambda x: x["exposure_score"])
+                clusters_out.append({
+                    "subject": cluster.title.lower().replace(" ", "_")[:40],
+                    "title": cluster.title,
+                    "summary": top["summary"],
+                    "article_count": len(chunk_articles),
+                    "articles": chunk_articles,
+                })
+        return clusters_out if clusters_out else None
+    except Exception as e:
+        print(f"[AGENT 1] Clustering error: {e}")
+        return None
+
+
+# Step IDs for real-time UI sync (must match frontend AGENT_STEPS order)
+STEP_INITIALIZING = "initializing"
+STEP_SCANNING = "scanning_news"
+STEP_ANALYZING = "analyzing_sentiment"
+STEP_CROSS_REFERENCING = "cross_referencing"
+STEP_EVALUATING = "evaluating_criticality"
+STEP_COMPILING = "compiling_results"
 
 
 def watcher_node(state: GraphState) -> dict:
     """
     Agent 1: collects articles (Tavily), LLM analysis (Gemini), Exposure scoring.
-    Formula: Exposure Score = (Authority x Severity) x Recency Multiplier
+    Formula: Exposure Score = (Authority × Severity) × Recency Multiplier.
+    Calls on_step(step_id) when provided in state for real-time UI sync.
     """
     t0 = time.time()
     company_name = state.get("company_name", "")
     customer_id = state.get("customer_id") or _derive_customer_id(company_name)
     crisis_id = str(uuid.uuid4())
+    on_step = state.get("on_step")  # optional: callable[[str], None]
+
+    def _emit(step_id: str) -> None:
+        if callable(on_step):
+            try:
+                on_step(step_id)
+            except Exception:
+                pass
+
+    _emit(STEP_INITIALIZING)
 
     # --- Step A: Tavily search ---
-    t_search = time.time()
-    raw_results = search_news(company_name, max_results=10)
-    print(f"[AGENT 1] Tavily search: {time.time() - t_search:.1f}s ({len(raw_results or [])} results)")
+    raw_results = search_news(company_name, max_results=5)
+    _emit(STEP_SCANNING)
     if not raw_results:
         print("[AGENT 1] No articles found by Tavily.")
+        _emit(STEP_COMPILING)
         return {
             "customer_id": customer_id,
             "crisis_id": crisis_id,
@@ -276,44 +307,113 @@ def watcher_node(state: GraphState) -> dict:
             "subjects": [],
         }
 
-    # --- Steps B, C, D: Parallel processing of all articles ---
-    t_process = time.time()
+    # --- Étapes B, C, D : Analyse et scoring pour chaque article ---
+    _emit(STEP_ANALYZING)
     articles = []
-    with ThreadPoolExecutor(max_workers=5) as pool:
-        futures = {pool.submit(_process_single_article, r, company_name): r for r in raw_results}
-        for future in as_completed(futures):
-            try:
-                result = future.result()
-                if result is not None:
-                    articles.append(result)
-                    print(f"[AGENT 1] Article found: {result['title'][:60]} | Score: {result['exposure_score']}")
-            except Exception as e:
-                title = futures[future].get("title", "?")
-                print(f"[AGENT 1] Error processing '{title[:50]}': {e}")
-    print(f"[AGENT 1] Parallel article processing: {time.time() - t_process:.1f}s ({len(articles)} kept)")
+    for r in raw_results:
+        title = r.get("title", "")
+        url = r.get("url", "")
+        pub_date = r.get("pub_date")
+
+        # Pre-filter: skip articles that don't mention the company or match noise patterns
+        if not _validate_result(title, company_name):
+            print(f"[AGENT 1] Skipped (validation): {title[:60]}...")
+            continue
+
+        # Use Tavily content only (Jina disabled for speed — Tavily snippets are sufficient)
+        content = r.get("content", "") or ""
+
+        # Keep articles even if paywalled — we return the 5 most relevant regardless
+
+        # Skip obvious newsletter/promo pages before calling Gemini
+        _title_lower = title.lower()
+        if any(x in _title_lower for x in ("sign up for", "newsletter", "get our newsletter", "subscribe to our")):
+            print(f"[AGENT 1] Skipped (newsletter/promo): {title[:60]}...")
+            continue
+
+        # B: Gemini (is_substantive + summary + subject + author + Authority + Severity)
+        scores = _analyze_article_with_gemini(title, content, url, company_name)
+        if scores is None:
+            summary = (content or "")[:300] if content else title  # fallback
+            subject = "ethics_management"
+            sub_theme = None
+            author = ""
+            authority_score = 3
+            severity_score = 2
+            sentiment = "neutral"
+        elif not getattr(scores, "is_substantive_article", True):
+            print(f"[AGENT 1] Skipped (not substantive): {title[:60]}...")
+            continue
+        else:
+            summary = (scores.summary or content or title)[:300]
+            subject = scores.subject if scores.subject in SUBJECT_KEYS else "ethics_management"
+            sub_theme = (getattr(scores, "sub_theme", "") or "").strip()[:80] or None
+            author = (scores.author or "").strip()[:200]
+            authority_score = scores.authority_score
+            severity_score = scores.severity_score
+            sentiment = getattr(scores, "sentiment", "neutral") or "neutral"
+            sentiment = sentiment.lower().strip()
+            if sentiment not in SENTIMENT_WEIGHTS:
+                sentiment = "neutral"
+
+        # C: Recency Multiplier (days-based)
+        recency_mult = _recency_multiplier(pub_date)
+
+        # D: Exposure Score formula
+        # base × risk_mult × recency × sentiment_weight (asymmetric: negative full, positive 0.1)
+        risk_mult = _get_risk_multiplier(subject)
+        sentiment_weight = SENTIMENT_WEIGHTS.get(sentiment, 0.5)
+        exposure_score = (
+            (authority_score * severity_score)
+            * risk_mult
+            * recency_mult
+            * sentiment_weight
+        )
+
+        article = {
+            "title": title,
+            "summary": summary,
+            "url": url,
+            "content": content,
+            "pub_date": pub_date,
+            "author": author,
+            "subject": subject,
+            "sub_theme": sub_theme,
+            "sentiment": sentiment,
+            "authority_score": authority_score,
+            "severity_score": severity_score,
+            "recency_multiplier": recency_mult,
+            "exposure_score": round(exposure_score, 2),
+        }
+        articles.append(article)
+        print(f"[AGENT 1] Article found: {title} | Score: {article['exposure_score']}")
+
+    _emit(STEP_CROSS_REFERENCING)
 
     # Sort by Exposure Score descending
     articles.sort(key=lambda a: a["exposure_score"], reverse=True)
+    _emit(STEP_EVALUATING)
 
-    # Group by subject for frontend
-    subjects_map: dict[str, list[dict]] = {}
-    for a in articles:
-        sub = a["subject"]
-        if sub not in subjects_map:
-            subjects_map[sub] = []
-        subjects_map[sub].append(a)
+    # Cluster articles with Gemini (single call, max 3 per cluster)
+    subjects = _cluster_articles_with_gemini(articles, max_per_cluster=3) or []
 
-    subjects = []
-    for sub, sub_articles in subjects_map.items():
-        # Summary = top article's summary (highest exposure in this subject)
-        top = max(sub_articles, key=lambda x: x["exposure_score"])
-        subjects.append({
-            "subject": sub,
-            "title": SUBJECT_DISPLAY_NAMES.get(sub, sub.replace("_", " ").title()),
-            "summary": top["summary"],
-            "article_count": len(sub_articles),
-            "articles": sub_articles,
-        })
+    # Fallback: if clustering failed, group by subject
+    if not subjects:
+        subjects_map: dict[str, list[dict]] = {}
+        for a in articles:
+            sub = a.get("subject", "other")
+            if sub not in subjects_map:
+                subjects_map[sub] = []
+            subjects_map[sub].append(a)
+        for sub, sub_articles in subjects_map.items():
+            top = max(sub_articles, key=lambda x: x["exposure_score"])
+            subjects.append({
+                "subject": sub,
+                "title": SUBJECT_DISPLAY_NAMES.get(sub, sub.replace("_", " ").title()),
+                "summary": top["summary"],
+                "article_count": len(sub_articles),
+                "articles": sub_articles,
+            })
 
     # Sort subjects by total exposure (sum of scores in group)
     subjects.sort(
@@ -321,7 +421,7 @@ def watcher_node(state: GraphState) -> dict:
         reverse=True,
     )
 
-    print(f"[AGENT 1] Total time: {time.time() - t0:.1f}s")
+    _emit(STEP_COMPILING)
     return {
         "customer_id": customer_id,
         "crisis_id": crisis_id,
