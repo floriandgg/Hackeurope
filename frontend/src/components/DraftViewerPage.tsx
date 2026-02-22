@@ -33,16 +33,6 @@ interface ToneMetric {
   value: number;
 }
 
-interface ReachItem {
-  channel: string;
-  reach: number;
-  formatted: string;
-}
-
-interface ConsistencyItem {
-  channel: string;
-  aligned: boolean;
-}
 
 /* ═══════════════════════════════════════════════════════════════════
    Strategy Metadata
@@ -453,52 +443,6 @@ const TONE_DATA: ToneMetric[][] = [
 
 const READING_LEVELS = ['Grade 9', 'Grade 11', 'Grade 14'];
 
-/* ═══════════════════════════════════════════════════════════════════
-   Audience Reach Data
-   ═══════════════════════════════════════════════════════════════════ */
-
-const REACH_DATA: ReachItem[] = [
-  { channel: 'Press Statement', reach: 2400000, formatted: '2.4M' },
-  { channel: 'Tweet Thread', reach: 1800000, formatted: '1.8M' },
-  { channel: 'Customer Email', reach: 890000, formatted: '890K' },
-  { channel: 'CEO Memo', reach: 12000, formatted: '12K' },
-];
-
-const MAX_REACH = 2400000;
-
-/* ═══════════════════════════════════════════════════════════════════
-   Consistency Data
-   ═══════════════════════════════════════════════════════════════════ */
-
-const CONSISTENCY_ITEMS: ConsistencyItem[] = [
-  { channel: 'Press Statement', aligned: true },
-  { channel: 'CEO Memo', aligned: true },
-  { channel: 'Tweet Thread', aligned: true },
-  { channel: 'Customer Email', aligned: true },
-  { channel: 'Q&A Brief', aligned: true },
-];
-
-const CORE_NARRATIVES = [
-  'We take full responsibility and are implementing immediate safeguards',
-  'We are taking proactive steps to raise the bar and move forward constructively',
-  'We are reviewing the matter through appropriate channels',
-];
-
-const CONSISTENCY_WARNINGS = [
-  'Tweet uses "incident", Press uses "breach" — recommend unifying to "breach"',
-  'CEO Memo uses "concerns", Press uses "discussions" — recommend aligning language',
-  'Customer email tone is softer than legal brief — verify consistency with counsel',
-];
-
-/* ═══════════════════════════════════════════════════════════════════
-   Risk Matrix Positions (x: impact %, y: risk % — from bottom-left)
-   ═══════════════════════════════════════════════════════════════════ */
-
-const RISK_POSITIONS = [
-  { x: 78, y: 22 }, // Own It: high impact, low risk
-  { x: 52, y: 52 }, // Reframe: medium, medium
-  { x: 28, y: 80 }, // Hold the Line: low impact, high risk
-];
 
 /* ═══════════════════════════════════════════════════════════════════
    Crisis Timeline Component
@@ -615,10 +559,21 @@ function ToneAnalysisCard({
 }) {
   return (
     <div className="rounded-2xl border border-mist bg-white p-6 shadow-[0_2px_16px_rgba(0,0,0,0.04)]">
-      <h4 className="text-[11px] font-body font-semibold text-silver tracking-[0.15em] uppercase mb-5">
-        Tone Analysis
-      </h4>
-      <div className="space-y-3.5">
+      <div className="flex items-center justify-between mb-5">
+        <h4 className="text-[11px] font-body font-semibold text-silver tracking-[0.15em] uppercase">
+          Tone Analysis
+        </h4>
+        <div>
+          <span className="text-[11px] font-body text-silver">Reading level:</span>
+          <span className="text-[12px] font-body font-semibold text-charcoal ml-2">
+            {readingLevel}
+          </span>
+          {readingLevel === 'Grade 9' && (
+            <span className="text-[11px] text-emerald-600 ml-1.5">(accessible)</span>
+          )}
+        </div>
+      </div>
+      <div className="grid grid-cols-2 sm:grid-cols-5 gap-x-8 gap-y-4">
         {metrics.map((m) => (
           <div key={m.label}>
             <div className="flex items-center justify-between mb-1.5">
@@ -639,262 +594,10 @@ function ToneAnalysisCard({
           </div>
         ))}
       </div>
-
-      <div className="mt-5 pt-4 border-t border-mist">
-        <span className="text-[11px] font-body text-silver">Reading level:</span>
-        <span className="text-[12px] font-body font-semibold text-charcoal ml-2">
-          {readingLevel}
-        </span>
-        {readingLevel === 'Grade 9' && (
-          <span className="text-[11px] text-emerald-600 ml-1.5">(accessible)</span>
-        )}
-      </div>
     </div>
   );
 }
 
-/* ═══════════════════════════════════════════════════════════════════
-   Audience Reach Card
-   ═══════════════════════════════════════════════════════════════════ */
-
-function AudienceReachCard({ strategyColor }: { strategyColor: string }) {
-  return (
-    <div className="rounded-2xl border border-mist bg-white p-6 shadow-[0_2px_16px_rgba(0,0,0,0.04)]">
-      <h4 className="text-[11px] font-body font-semibold text-silver tracking-[0.15em] uppercase mb-5">
-        Audience Reach
-      </h4>
-      <div className="space-y-4">
-        {REACH_DATA.map((item) => (
-          <div key={item.channel}>
-            <div className="flex items-center justify-between mb-1.5">
-              <span className="text-[12px] font-body text-storm">{item.channel}</span>
-              <span className="text-[12px] font-body font-semibold text-charcoal tabular-nums">
-                {item.formatted}
-              </span>
-            </div>
-            <div className="w-full h-2 rounded-full bg-mist overflow-hidden">
-              <div
-                className="h-full rounded-full transition-all duration-700 ease-out"
-                style={{
-                  width: `${(item.reach / MAX_REACH) * 100}%`,
-                  backgroundColor: strategyColor,
-                  opacity: 0.7 + (item.reach / MAX_REACH) * 0.3,
-                }}
-              />
-            </div>
-          </div>
-        ))}
-      </div>
-    </div>
-  );
-}
-
-/* ═══════════════════════════════════════════════════════════════════
-   Risk Matrix Card
-   ═══════════════════════════════════════════════════════════════════ */
-
-function RiskMatrixCard({ activeStrategy }: { activeStrategy: number }) {
-  const labels = ['Own It', 'Reframe', 'Hold Line'];
-
-  return (
-    <div className="rounded-2xl border border-mist bg-white p-6 shadow-[0_2px_16px_rgba(0,0,0,0.04)]">
-      <h4 className="text-[11px] font-body font-semibold text-silver tracking-[0.15em] uppercase mb-5">
-        Risk Matrix
-      </h4>
-
-      {/* Plot area */}
-      <div className="relative w-full aspect-square border-l-2 border-b-2 border-mist">
-        {/* Y-axis label */}
-        <span
-          className="absolute -left-1 top-1/2 -translate-y-1/2 -translate-x-full
-                     text-[9px] font-body text-silver uppercase tracking-wider"
-          style={{ writingMode: 'vertical-lr', transform: 'rotate(180deg) translateX(50%)' }}
-        >
-          Risk
-        </span>
-        {/* X-axis label */}
-        <span className="absolute -bottom-1 left-1/2 -translate-x-1/2 translate-y-full text-[9px] font-body text-silver uppercase tracking-wider mt-1">
-          Impact
-        </span>
-
-        {/* Grid lines */}
-        <div className="absolute top-1/2 left-0 w-full h-px bg-mist" />
-        <div className="absolute top-0 left-1/2 w-px h-full bg-mist" />
-
-        {/* Axis labels */}
-        <span className="absolute top-1 left-1 text-[8px] text-silver">H</span>
-        <span className="absolute bottom-1 left-1 text-[8px] text-silver">L</span>
-        <span className="absolute bottom-1 right-1 text-[8px] text-silver">H</span>
-
-        {/* Strategy dots */}
-        {RISK_POSITIONS.map((pos, i) => {
-          const isActive = i === activeStrategy;
-          const meta = STRATEGY_META[i];
-
-          return (
-            <div
-              key={i}
-              className="absolute flex items-center gap-1.5 transition-all duration-500"
-              style={{
-                left: `${pos.x}%`,
-                bottom: `${100 - pos.y}%`,
-                transform: 'translate(-50%, 50%)',
-              }}
-            >
-              <div
-                className="rounded-full transition-all duration-300"
-                style={{
-                  width: isActive ? 14 : 10,
-                  height: isActive ? 14 : 10,
-                  backgroundColor: meta.color,
-                  boxShadow: isActive ? `0 0 10px ${meta.color}50` : 'none',
-                  opacity: isActive ? 1 : 0.5,
-                }}
-              />
-            </div>
-          );
-        })}
-      </div>
-
-      {/* Legend */}
-      <div className="mt-4 pt-3 border-t border-mist space-y-1.5">
-        {labels.map((label, i) => {
-          const isActive = i === activeStrategy;
-          const meta = STRATEGY_META[i];
-          return (
-            <div key={i} className="flex items-center gap-2">
-              <span
-                className="w-2 h-2 rounded-full shrink-0"
-                style={{
-                  backgroundColor: meta.color,
-                  opacity: isActive ? 1 : 0.4,
-                }}
-              />
-              <span
-                className="text-[11px] font-body transition-colors"
-                style={{
-                  color: isActive ? '#2d3038' : '#b4b8c0',
-                  fontWeight: isActive ? 600 : 400,
-                }}
-              >
-                {label}
-                {isActive && (
-                  <svg width="10" height="10" viewBox="0 0 24 24" fill="#f59e0b" className="inline ml-1 -mt-0.5">
-                    <path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z" />
-                  </svg>
-                )}
-              </span>
-            </div>
-          );
-        })}
-      </div>
-    </div>
-  );
-}
-
-/* ═══════════════════════════════════════════════════════════════════
-   Key Message Consistency Panel
-   ═══════════════════════════════════════════════════════════════════ */
-
-function ConsistencyPanel({
-  narrative,
-  warning,
-  strategyColor,
-}: {
-  narrative: string;
-  warning: string;
-  strategyColor: string;
-}) {
-  return (
-    <div className="rounded-2xl border border-mist bg-white p-6 shadow-[0_2px_16px_rgba(0,0,0,0.04)]">
-      <div className="flex items-center gap-2.5 mb-5">
-        <svg
-          width="16"
-          height="16"
-          viewBox="0 0 24 24"
-          fill="none"
-          stroke={strategyColor}
-          strokeWidth="2"
-          strokeLinecap="round"
-          strokeLinejoin="round"
-        >
-          <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" />
-        </svg>
-        <h4 className="text-[11px] font-body font-semibold text-silver tracking-[0.15em] uppercase">
-          Key Message Consistency Check
-        </h4>
-      </div>
-
-      {/* Core narrative */}
-      <div className="mb-5 p-4 rounded-xl bg-mist/40 border border-mist">
-        <span className="text-[10px] font-body font-medium text-silver tracking-wide uppercase block mb-1.5">
-          Core Narrative
-        </span>
-        <p className="text-[14px] font-display italic text-charcoal leading-relaxed">
-          "{narrative}"
-        </p>
-      </div>
-
-      {/* Alignment grid */}
-      <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 mb-5">
-        {CONSISTENCY_ITEMS.map((item) => (
-          <div
-            key={item.channel}
-            className="flex items-center gap-2 px-3 py-2 rounded-lg bg-mist/30"
-          >
-            <svg
-              width="14"
-              height="14"
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="#22c55e"
-              strokeWidth="2.5"
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              className="shrink-0"
-            >
-              <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14" />
-              <path d="M22 4L12 14.01l-3-3" />
-            </svg>
-            <div>
-              <span className="text-[12px] font-body text-charcoal block leading-tight">
-                {item.channel}
-              </span>
-              <span className="text-[10px] font-body text-emerald-600">aligned</span>
-            </div>
-          </div>
-        ))}
-      </div>
-
-      {/* Warning */}
-      <div className="flex gap-3 p-4 rounded-xl bg-amber-50 border border-amber-200/60">
-        <svg
-          width="16"
-          height="16"
-          viewBox="0 0 24 24"
-          fill="none"
-          stroke="#d97706"
-          strokeWidth="2"
-          strokeLinecap="round"
-          strokeLinejoin="round"
-          className="shrink-0 mt-0.5"
-        >
-          <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z" />
-          <line x1="12" y1="9" x2="12" y2="13" />
-          <line x1="12" y1="17" x2="12.01" y2="17" />
-        </svg>
-        <div>
-          <span className="text-[11px] font-body font-semibold text-amber-800 block mb-0.5">
-            Inconsistency detected
-          </span>
-          <p className="text-[12px] font-body text-amber-700 leading-relaxed">
-            {warning}
-          </p>
-        </div>
-      </div>
-    </div>
-  );
-}
 
 /* ═══════════════════════════════════════════════════════════════════
    Main Page
@@ -987,9 +690,6 @@ export default function DraftViewerPage({
                 <h2 className="font-display text-3xl text-charcoal tracking-tight">
                   {meta.name} Strategy
                 </h2>
-                <span className="text-[13px] font-body text-storm">
-                  — Response War Room
-                </span>
               </div>
               <p className="text-sm text-storm">
                 <span className="font-medium text-charcoal">{companyName}</span>
@@ -1014,54 +714,48 @@ export default function DraftViewerPage({
               />
             </div>
 
-            {/* ── Channels + Draft Viewer ── */}
+            {/* ── Channel Tabs + Draft Viewer ── */}
             <div
-              className="flex flex-col lg:flex-row gap-6 mb-8 opacity-0 animate-fade-in-up"
+              className="mb-8 opacity-0 animate-fade-in-up"
               style={{ animationDelay: '400ms' }}
             >
-              {/* Channel sidebar */}
-              <div className="lg:w-[200px] shrink-0">
-                <h4 className="text-[11px] font-body font-semibold text-silver tracking-[0.15em] uppercase mb-3 px-1">
-                  Channels
-                </h4>
-                <div className="flex lg:flex-col gap-2 overflow-x-auto lg:overflow-visible scrollbar-hide">
-                  {CHANNELS.map((ch, i) => {
-                    const isActive = i === activeChannel;
-                    return (
-                      <button
-                        key={ch.name}
-                        onClick={() => setActiveChannel(i)}
-                        className="flex items-center gap-2.5 px-4 py-3 rounded-xl border text-left
-                                   whitespace-nowrap lg:whitespace-normal
-                                   transition-all duration-200 shrink-0 lg:shrink lg:w-full"
-                        style={{
-                          backgroundColor: isActive ? meta.colorLight : '#ffffff',
-                          borderColor: isActive ? meta.colorMid : '#e8eaf0',
-                          boxShadow: isActive
-                            ? `0 2px 12px ${meta.color}15`
-                            : '0 1px 4px rgba(0,0,0,0.03)',
-                        }}
+              {/* Channel tabs — horizontal row above the draft */}
+              <div className="flex gap-2 overflow-x-auto scrollbar-hide mb-4">
+                {CHANNELS.map((ch, i) => {
+                  const isActive = i === activeChannel;
+                  return (
+                    <button
+                      key={ch.name}
+                      onClick={() => setActiveChannel(i)}
+                      className="flex items-center gap-2 px-4 py-2.5 rounded-xl border
+                                 whitespace-nowrap transition-all duration-200 shrink-0"
+                      style={{
+                        backgroundColor: isActive ? meta.colorLight : '#ffffff',
+                        borderColor: isActive ? meta.colorMid : '#e8eaf0',
+                        boxShadow: isActive
+                          ? `0 2px 12px ${meta.color}15`
+                          : '0 1px 4px rgba(0,0,0,0.03)',
+                      }}
+                    >
+                      <span
+                        className="transition-colors duration-200"
+                        style={{ color: isActive ? meta.color : '#6d8a9e' }}
                       >
-                        <span
-                          className="transition-colors duration-200"
-                          style={{ color: isActive ? meta.color : '#6d8a9e' }}
-                        >
-                          {ch.icon}
-                        </span>
-                        <span
-                          className="text-[13px] font-body font-medium transition-colors duration-200"
-                          style={{ color: isActive ? '#2d3038' : '#6d8a9e' }}
-                        >
-                          {ch.name}
-                        </span>
-                      </button>
-                    );
-                  })}
-                </div>
+                        {ch.icon}
+                      </span>
+                      <span
+                        className="text-[13px] font-body font-medium transition-colors duration-200"
+                        style={{ color: isActive ? '#2d3038' : '#6d8a9e' }}
+                      >
+                        {ch.name}
+                      </span>
+                    </button>
+                  );
+                })}
               </div>
 
               {/* Draft viewer */}
-              <div className="flex-1 rounded-2xl border border-mist bg-white shadow-[0_2px_16px_rgba(0,0,0,0.04)] flex flex-col min-h-[400px]">
+              <div className="rounded-2xl border border-mist bg-white shadow-[0_2px_16px_rgba(0,0,0,0.04)] flex flex-col min-h-[400px]">
                 {/* Draft header */}
                 <div className="flex items-center justify-between px-6 py-4 border-b border-mist">
                   <div className="flex items-center gap-2.5">
@@ -1123,33 +817,14 @@ export default function DraftViewerPage({
               </div>
             </div>
 
-            {/* ── Data Intelligence Panels ── */}
-            <div
-              className="opacity-0 animate-fade-in-up"
-              style={{ animationDelay: '550ms' }}
-            >
-              <h4 className="text-[11px] font-body font-semibold text-silver tracking-[0.15em] uppercase mb-4 px-1">
-                Data Intelligence Panels
-              </h4>
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
-                <ToneAnalysisCard
-                  metrics={toneMetrics}
-                  readingLevel={readingLevel}
-                  strategyColor={meta.color}
-                />
-                <AudienceReachCard strategyColor={meta.color} />
-                <RiskMatrixCard activeStrategy={strategyIndex} />
-              </div>
-            </div>
-
-            {/* ── Consistency Check ── */}
+            {/* ── Tone Analysis — full width ── */}
             <div
               className="opacity-0 animate-fade-in-up mb-8"
-              style={{ animationDelay: '700ms' }}
+              style={{ animationDelay: '550ms' }}
             >
-              <ConsistencyPanel
-                narrative={CORE_NARRATIVES[strategyIndex] ?? CORE_NARRATIVES[0]}
-                warning={CONSISTENCY_WARNINGS[strategyIndex] ?? CONSISTENCY_WARNINGS[0]}
+              <ToneAnalysisCard
+                metrics={toneMetrics}
+                readingLevel={readingLevel}
                 strategyColor={meta.color}
               />
             </div>
