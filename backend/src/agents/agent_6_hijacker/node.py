@@ -13,16 +13,22 @@ from __future__ import annotations
 import os
 import time
 import traceback
+from pathlib import Path
 from typing import Any
 
 import requests
+from dotenv import load_dotenv
+
+# Force load backend/.env so VERCEL_API_TOKEN is always available regardless of CWD
+_env_backend = Path(__file__).resolve().parents[3] / ".env"
+load_dotenv(_env_backend, override=True)
 
 from src.graph.state import GraphState
 from src.clients.llm_client import llm_pro_alt as llm_pro, llm_flash_alt as llm_flash
 
 
 MAX_LLM_RETRIES = 3
-SEVERITY_THRESHOLD = 3
+SEVERITY_THRESHOLD = 1
 
 LANDING_PAGE_SYSTEM_PROMPT = """\
 You are a Front-End developer and a crisis communications expert.
@@ -138,13 +144,19 @@ def deploy_to_vercel(html_content: str, company_name: str) -> str:
         ],
         "projectSettings": {
             "framework": None,
+            "buildCommand": None,
+            "installCommand": None,
+            "outputDirectory": ".",
+            "devCommand": None,
+            "rootDirectory": None,
         },
     }
 
+    url = "https://api.vercel.com/v13/deployments?skipAutoDetectionConfirmation=1"
     print(f"[AGENT 6] [VERCEL] Deploying {project_name}...")
     try:
         resp = requests.post(
-            "https://api.vercel.com/v13/deployments",
+            url,
             json=payload,
             headers=headers,
             timeout=30,

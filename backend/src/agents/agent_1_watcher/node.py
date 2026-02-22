@@ -11,7 +11,7 @@ from datetime import datetime
 from dateutil import parser as date_parser
 
 from src.graph.state import GraphState
-from src.clients.tavily_client import tavily_client, search_news
+from src.clients.tavily_client import tavily_client, search_news, _COMPANY_ALIASES
 from src.clients.llm_client import llm
 from src.shared.types import (
     ArticleScores,
@@ -149,17 +149,23 @@ _TITLE_BLACKLIST = (
 
 def _validate_result(article_title: str, company_name: str) -> bool:
     """
-    Pre-filter: reject articles that don't mention the company or match known noise.
+    Pre-filter: reject articles that don't mention the company (or its aliases) or match known noise.
     Saves Jina/Gemini calls for clearly irrelevant results.
     """
     if not article_title or not company_name:
         return False
     title_lower = article_title.lower()
     company_lower = company_name.lower()
-    # 1. Company name must appear in title
-    if company_lower not in title_lower:
+
+    # Build list of accepted name variants
+    names_to_check = [company_lower]
+    aliases = _COMPANY_ALIASES.get(company_lower, [])
+    names_to_check.extend(a.lower() for a in aliases)
+
+    # At least one variant must appear in the title
+    if not any(name in title_lower for name in names_to_check):
         return False
-    # 2. Blacklist noisy patterns
+    # Blacklist noisy patterns
     if any(word in title_lower for word in _TITLE_BLACKLIST):
         return False
     return True

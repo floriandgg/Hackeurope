@@ -18,6 +18,8 @@ _env_cwd = Path.cwd() / ".env"
 _env_backend = Path(__file__).resolve().parents[1] / ".env"
 _env_root = Path(__file__).resolve().parents[2] / ".env"
 load_dotenv(_env_cwd) or load_dotenv(_env_backend) or load_dotenv(_env_root)
+# Always load backend/.env so VERCEL_API_TOKEN and other backend vars are available
+load_dotenv(_env_backend)
 
 _backend = Path(__file__).resolve().parents[1]
 if str(_backend) not in sys.path:

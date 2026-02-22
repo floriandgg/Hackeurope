@@ -1,5 +1,6 @@
 """
 Tavily API client — news search.
+Bilingual (EN/FR) crisis keywords, no domain restriction for global coverage.
 """
 import os
 from pathlib import Path
@@ -16,46 +17,77 @@ TAVILY_API_KEY = os.getenv("TAVILY_API_KEY")
 tavily_client = TavilyClient(api_key=TAVILY_API_KEY) if TAVILY_API_KEY else None
 
 
-# Trusted news domains for crisis monitoring (prioritizes reach & credibility)
-_INCLUDE_DOMAINS = [
-    "reuters.com",
-    "bloomberg.com",
-    "techcrunch.com",
-    "cnbc.com",
-    "theverge.com",
-    "wsj.com",
-    "nytimes.com",
-    "ft.com",
-    "theguardian.com",
-    "apnews.com",
-    "bbc.com",
-    "cnn.com",
-    "forbes.com",
-    "businessinsider.com",
-]
-
 CRISIS_KEYWORDS = (
-    'layoff OR outage OR lawsuit OR investigation OR scandal OR breach OR "stock drop" OR "legal battle"'
+    'scandal OR lawsuit OR investigation OR breach OR layoff OR outage '
+    'OR "stock drop" OR "legal battle" OR controversy OR fine OR fraud '
+    'OR scandale OR procès OR enquête OR amende OR licenciement OR fraude '
+    'OR polémique OR condamnation OR pollution OR "mise en examen"'
 )
+
+# Well-known corporate name aliases (short name → possible official names)
+_COMPANY_ALIASES: dict[str, list[str]] = {
+    "total": ["TotalEnergies", "Total SE", "Total S.A."],
+    "bnp": ["BNP Paribas"],
+    "sg": ["Société Générale", "Societe Generale"],
+    "sanofi": ["Sanofi S.A."],
+    "lvmh": ["LVMH Moët Hennessy"],
+    "edf": ["EDF", "Électricité de France"],
+    "engie": ["Engie SA"],
+    "renault": ["Renault Group", "Renault SA"],
+    "stellantis": ["Stellantis N.V."],
+    "carrefour": ["Carrefour SA"],
+    "danone": ["Danone SA"],
+    "orange": ["Orange S.A.", "Orange Telecom"],
+    "airbus": ["Airbus SE"],
+    "axa": ["AXA SA"],
+    "credit agricole": ["Crédit Agricole"],
+    "veolia": ["Veolia Environnement"],
+    "bouygues": ["Bouygues SA"],
+    "vinci": ["Vinci SA"],
+    "safran": ["Safran SA"],
+    "thales": ["Thales Group"],
+    "bolloré": ["Bolloré Group", "Bollore"],
+    "bollore": ["Bolloré Group"],
+    "pernod": ["Pernod Ricard"],
+    "loreal": ["L'Oréal"],
+    "l'oréal": ["L'Oreal"],
+    "hermes": ["Hermès International"],
+    "hermès": ["Hermes International"],
+    "kering": ["Kering SA"],
+    "michelin": ["Michelin Group"],
+    "alstom": ["Alstom SA"],
+    "accor": ["Accor SA"],
+}
+
+
+def _expand_company_query(company_name: str) -> str:
+    """Build a query string that covers the user-typed name + known aliases."""
+    key = company_name.strip().lower()
+    aliases = _COMPANY_ALIASES.get(key, [])
+    names = [company_name] + aliases
+    quoted = " OR ".join(f'"{n}"' for n in names)
+    return f"({quoted})"
 
 
 def search_news(company_name: str, max_results: int = 5) -> list[dict]:
     """
     Searches for crisis-related news about a company.
-    Uses topic="news", search_depth="advanced", crisis keywords, and trusted domains.
+    No domain restriction — Gemini's is_substantive_article filter handles noise.
     """
     if not tavily_client:
         print("[AGENT 1] Tavily client not configured (TAVILY_API_KEY missing).")
         return []
 
-    query = f'"{company_name}" ({CRISIS_KEYWORDS})'
+    company_q = _expand_company_query(company_name)
+    query = f'{company_q} ({CRISIS_KEYWORDS})'
+    print(f"[AGENT 1] Tavily query: {query[:200]}")
+
     response = tavily_client.search(
         query=query,
         search_depth="advanced",
         topic="news",
         max_results=max_results,
-        include_domains=_INCLUDE_DOMAINS,
-        time_range="m",  # last 30 days
+        time_range="y",
     )
 
     results = []
@@ -65,6 +97,6 @@ def search_news(company_name: str, max_results: int = 5) -> list[dict]:
             "url": r.get("url", ""),
             "content": r.get("content", ""),
             "score": r.get("score", 0.0),
-            "pub_date": r.get("published_date") or r.get("pub_date"),  # available if topic="news"
+            "pub_date": r.get("published_date") or r.get("pub_date"),
         })
     return results
