@@ -211,3 +211,17 @@ class Agent5Output(BaseModel):
     trade_off_reasoning: str = Field(description="Why AI crisis management delivers better ROI than a traditional agency")
     action_refused: bool = Field(default=False, description="True if the crisis was too minor to warrant billable action")
     refusal_reason: str = Field(default="", description="Explanation if action was refused")
+
+
+# --- Agent 6: Narrative Hijacker structured output ---
+
+
+class Agent6Output(BaseModel):
+    """Structured output of Agent 6 (The Narrative Hijacker)."""
+    hijacker_live_url: str = Field(default="", description="Live URL of the deployed crisis landing page")
+    hijacker_html_generated: bool = Field(default=False, description="Whether HTML was successfully generated")
+    hijacker_deployed: bool = Field(default=False, description="Whether the page was deployed to Vercel")
+    hijacker_ads_simulated: bool = Field(default=False, description="Whether ad keyword hijacking was simulated")
+    hijacker_ads_keywords: int = Field(default=0, ge=0, description="Number of keywords acquired in simulation")
+    hijacker_ads_budget_eur: float = Field(default=0.0, ge=0, description="Simulated ads budget in EUR")
+    agent6_api_cost_eur: float = Field(default=0.0, ge=0, description="LLM API cost for HTML generation")

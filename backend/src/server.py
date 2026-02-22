@@ -29,6 +29,7 @@ from src.agents.agent_2_precedents.node import precedents_node_from_topic
 from src.agents.agent_3_scorer.node import scorer_from_articles
 from src.agents.agent_4_strategist.node import strategist_from_data
 from src.agents.agent_5_cfo.node import cfo_from_data
+from src.agents.agent_6_hijacker.node import hijacker_from_data
 
 app = FastAPI(title="Crisis PR Agent API")
 
@@ -82,6 +83,33 @@ def precedents(req: PrecedentsRequest):
         "precedents": result["precedents"],
         "global_lesson": result["global_lesson"],
         "confidence": result["confidence"],
+    }
+
+
+class HijackerRequest(BaseModel):
+    company_name: str
+    articles: list[dict] = []
+    global_lesson: str = ""
+    severity_score: int = 3
+
+
+@app.post("/api/hijacker")
+def hijacker(req: HijackerRequest):
+    """Run Agent 6 standalone — generate landing page, deploy, simulate ads."""
+    result = hijacker_from_data(
+        company_name=req.company_name,
+        articles=req.articles,
+        global_lesson=req.global_lesson,
+        severity_score=req.severity_score,
+    )
+    return {
+        "live_url": result.get("hijacker_live_url", ""),
+        "html_generated": result.get("hijacker_html_generated", False),
+        "deployed": result.get("hijacker_deployed", False),
+        "ads_simulated": result.get("hijacker_ads_simulated", False),
+        "ads_keywords": result.get("hijacker_ads_keywords", 0),
+        "ads_budget_eur": result.get("hijacker_ads_budget_eur", 0.0),
+        "api_cost_eur": result.get("agent6_api_cost_eur", 0.0),
     }
 
 
@@ -149,6 +177,16 @@ def crisis_response(req: CrisisResponseRequest):
         alert_level=alert_level,
     )
 
+    # --- SEQUENTIAL: Agent 6 (needs severity + global_lesson + articles) ---
+    t3 = time.time()
+    hijacker_result = hijacker_from_data(
+        company_name=req.company_name,
+        articles=enriched_articles,
+        global_lesson=global_lesson,
+        severity_score=severity_score,
+    )
+    print(f"[SERVER] Agent 6 done in {time.time() - t3:.1f}s")
+
     total_elapsed = time.time() - t0
     print(f"[SERVER] Full pipeline done in {total_elapsed:.1f}s")
 
@@ -159,4 +197,13 @@ def crisis_response(req: CrisisResponseRequest):
         "global_lesson": global_lesson,
         "confidence": confidence,
         "invoice": cfo_result.get("invoice", {}),
+        "hijacker": {
+            "live_url": hijacker_result.get("hijacker_live_url", ""),
+            "html_generated": hijacker_result.get("hijacker_html_generated", False),
+            "deployed": hijacker_result.get("hijacker_deployed", False),
+            "ads_simulated": hijacker_result.get("hijacker_ads_simulated", False),
+            "ads_keywords": hijacker_result.get("hijacker_ads_keywords", 0),
+            "ads_budget_eur": hijacker_result.get("hijacker_ads_budget_eur", 0.0),
+            "api_cost_eur": hijacker_result.get("agent6_api_cost_eur", 0.0),
+        },
     }

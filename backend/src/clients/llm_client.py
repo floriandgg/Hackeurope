@@ -29,7 +29,7 @@ llm_flash = ChatGoogleGenerativeAI(
 ) if GOOGLE_API_KEY else None
 
 llm_pro = ChatGoogleGenerativeAI(
-    model="gemini-3-flash-preview",
+    model="gemini-2.5-flash",
     google_api_key=GOOGLE_API_KEY,
     temperature=0,
 ) if GOOGLE_API_KEY else None
@@ -42,7 +42,7 @@ llm_flash_alt = ChatGoogleGenerativeAI(
 ) if GOOGLE_API_KEY1 else None
 
 llm_pro_alt = ChatGoogleGenerativeAI(
-    model="gemini-2.5-pro",
+    model="gemini-2.5-flash",
     google_api_key=GOOGLE_API_KEY1,
     temperature=0,
 ) if GOOGLE_API_KEY1 else None
