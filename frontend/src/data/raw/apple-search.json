@@ -1,0 +1,134 @@
+{
+  "company_name": "Apple",
+  "crisis_id": "731ddb51-07d1-428d-971d-dd572764f09f",
+  "subjects": [
+    {
+      "subject": "ethics_management",
+      "title": "Ethics & Management",
+      "summary": "Apple is facing intense scrutiny and a warning from FTC Chairman Andrew Ferguson over allegations that its Apple News app inflames political polarization by aggressively promoting left-leaning outlets while stifling conservative news. A study by Media Research Center highlighted this alleged bias, l",
+      "article_count": 4,
+      "articles": [
+        {
+          "title": "Apple News ‘inflames political polarization’ as it excludes conservative outlets from ‘top stories’: bombshell study - New York Post",
+          "summary": "Apple is facing intense scrutiny and a warning from FTC Chairman Andrew Ferguson over allegations that its Apple News app inflames political polarization by aggressively promoting left-leaning outlets while stifling conservative news. A study by Media Research Center highlighted this alleged bias, l",
+          "url": "https://nypost.com/2026/02/18/business/apple-news-inflames-political-polarization-as-it-excludes-conservative-outlets-study/",
+          "pub_date": "Wed, 18 Feb 2026 20:33:35 GMT",
+          "author": "",
+          "subject": "ethics_management",
+          "sentiment": "negative",
+          "authority_score": 4,
+          "severity_score": 4,
+          "recency_multiplier": 1.2,
+          "exposure_score": 34.56
+        },
+        {
+          "title": "Marsha Blackburn sends letter to Apple CEO seeking answers on news app's alleged bias - Fox News",
+          "summary": "Senator Marsha Blackburn and the FTC have sent letters to Apple CEO Tim Cook, seeking answers regarding alleged political bias in the curation of Apple News. The letters question how Apple chooses its stories and whether its conduct violates the FTC Act.",
+          "url": "https://www.foxnews.com/media/marsha-blackburn-sends-letter-apple-ceo-seeking-answers-news-apps-alleged-bias",
+          "pub_date": "Fri, 20 Feb 2026 12:00:04 GMT",
+          "author": "Joseph A. Wulfsohn",
+          "subject": "ethics_management",
+          "sentiment": "negative",
+          "authority_score": 4,
+          "severity_score": 3,
+          "recency_multiplier": 1.5,
+          "exposure_score": 32.4
+        },
+        {
+          "title": "Early ChatGPT Advertisers Are \"Aspirational\" 02/16/2026 - MediaPost",
+          "summary": "The article discusses early advertisers using ChatGPT, characterizing their efforts as 'aspirational'. The provided excerpt is mostly navigation and does not contain the full content of the article.",
+          "url": "https://www.mediapost.com/publications/article/412825/early-chatgpt-advertisers-are-aspirational.html?edition=141589",
+          "pub_date": "Mon, 16 Feb 2026 13:06:38 GMT",
+          "author": "",
+          "subject": "ethics_management",
+          "sentiment": "neutral",
+          "authority_score": 3,
+          "severity_score": 1,
+          "recency_multiplier": 1.2,
+          "exposure_score": 3.24
+        },
+        {
+          "title": "PMG Traverses North America: Opens Mexico City, Toronto Offices 02/16/2026 - MediaPost",
+          "summary": "PMG is expanding its North American operations by opening new offices in Mexico City and Toronto. This move signifies the company's growth and increased market presence across the continent.",
+          "url": "https://www.mediapost.com/publications/article/412785/pmg-traverses-north-america-opens-mexico-city-to.html?edition=141589",
+          "pub_date": "Mon, 16 Feb 2026 09:13:16 GMT",
+          "author": "",
+          "subject": "ethics_management",
+          "sentiment": "positive",
+          "authority_score": 3,
+          "severity_score": 1,
+          "recency_multiplier": 1.2,
+          "exposure_score": 0.65
+        }
+      ]
+    },
+    {
+      "subject": "legal_compliance",
+      "title": "Legal & Compliance",
+      "summary": "Apple is facing a lawsuit from West Virginia's Attorney General alleging that iCloud is being used to store and distribute child sexual abuse material (CSAM). The lawsuit claims Apple executives were aware of the issue for years and chose to do nothing, with alleged iMessage screenshots showing an e",
+      "article_count": 3,
+      "articles": [
+        {
+          "title": "Apple Sued Over Allegations of CSAM on iCloud - CNET",
+          "summary": "Apple is facing a lawsuit from West Virginia's Attorney General alleging that iCloud is being used to store and distribute child sexual abuse material (CSAM). The lawsuit claims Apple executives were aware of the issue for years and chose to do nothing, with alleged iMessage screenshots showing an e",
+          "url": "https://www.cnet.com/tech/services-and-software/apple-sued-over-csam-icloud-allegations/",
+          "pub_date": "Thu, 19 Feb 2026 21:18:00 GMT",
+          "author": "",
+          "subject": "legal_compliance",
+          "sentiment": "negative",
+          "authority_score": 3,
+          "severity_score": 5,
+          "recency_multiplier": 1.5,
+          "exposure_score": 33.75
+        },
+        {
+          "title": "FTC Chair Warns Apple Over News Curation 02/13/2026 - MediaPost",
+          "summary": "The FTC Chair has warned Apple in a letter, alleging that the company may be violating federal consumer protection law by promoting liberal publications and suppressing right-wing ones in Apple News. The letter states that such practices, if inconsistent with Apple's terms or consumer expectations, ",
+          "url": "https://www.mediapost.com/publications/article/412758/ftc-chair-warns-apple-over-news-curation.html?edition=141592",
+          "pub_date": "Wed, 18 Feb 2026 11:26:44 GMT",
+          "author": "",
+          "subject": "legal_compliance",
+          "sentiment": "negative",
+          "authority_score": 3,
+          "severity_score": 3,
+          "recency_multiplier": 1.2,
+          "exposure_score": 16.2
+        },
+        {
+          "title": "West Virginia Bill Would Forbid Use Of Media Bias Monitors By State 02/16/2026 - MediaPost",
+          "summary": "The article reports on a proposed West Virginia bill that aims to forbid the state from utilizing media bias monitors. This legislative action could impact how state entities assess media content.",
+          "url": "https://www.mediapost.com/publications/article/412827/west-virginia-bill-would-forbid-use-of-media-bias.html?edition=141589",
+          "pub_date": "Mon, 16 Feb 2026 14:05:03 GMT",
+          "author": "",
+          "subject": "legal_compliance",
+          "sentiment": "neutral",
+          "authority_score": 3,
+          "severity_score": 3,
+          "recency_multiplier": 1.2,
+          "exposure_score": 8.1
+        }
+      ]
+    },
+    {
+      "subject": "product_bug",
+      "title": "Product & Technical",
+      "summary": "Apple is expected to announce a low-cost MacBook with new color options at an event on March 4. Additionally, new data indicates that iOS 26 adoption rates are similar to previous versions despite a controversial \"Liquid Glass\" design, though slightly lagging.",
+      "article_count": 1,
+      "articles": [
+        {
+          "title": "Top Stories: Apple Event on March 4, iOS 26.4 Beta, and More - MacRumors",
+          "summary": "Apple is expected to announce a low-cost MacBook with new color options at an event on March 4. Additionally, new data indicates that iOS 26 adoption rates are similar to previous versions despite a controversial \"Liquid Glass\" design, though slightly lagging.",
+          "url": "https://www.macrumors.com/2026/02/21/top-stories-apple-event-march-4/",
+          "pub_date": "Sat, 21 Feb 2026 14:00:00 GMT",
+          "author": "Hartley Charlton",
+          "subject": "product_bug",
+          "sentiment": "neutral",
+          "authority_score": 3,
+          "severity_score": 1,
+          "recency_multiplier": 1.5,
+          "exposure_score": 2.7
+        }
+      ]
+    }
+  ]
+}

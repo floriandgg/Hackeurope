@@ -137,7 +137,9 @@ def _get_risk_multiplier(subject: str) -> float:
     return SUBJECT_RISK_MULTIPLIERS.get(subject.strip().lower(), 1.0)
 
 
-def _analyze_article_with_gemini(title: str, content: str, url: str) -> ArticleScores | None:
+def _analyze_article_with_gemini(
+    title: str, content: str, url: str, company_name: str
+) -> ArticleScores | None:
     """Calls Gemini to get summary, Authority and Severity."""
     if not llm:
         print("[AGENT 1] Gemini client not configured (GOOGLE_API_KEY missing).")
@@ -145,8 +147,10 @@ def _analyze_article_with_gemini(title: str, content: str, url: str) -> ArticleS
     structured_llm = llm.with_structured_output(ArticleScores)
     prompt = """You are an expert in media analysis and crisis management.
 
+The company we are monitoring is: {company_name}
+
 For this article, provide:
-1. **is_substantive_article**: True ONLY if this is a real news article about the company. False if it's a newsletter signup page, promotional content, or mostly navigation/footer boilerplate (e.g. "Sign up for our newsletters", "Related Articles", "Subscribe and interact").
+1. **is_substantive_article**: True ONLY if this is a real news article PRIMARILY about {company_name}. Set to False if: the article is about a different company (e.g. Alibaba when we search for Amazon), a newsletter signup page, promotional content, or mostly navigation/footer boilerplate (e.g. "Sign up for our newsletters", "Related Articles", "Subscribe and interact").
 2. **summary**: A concise summary in 1-3 sentences (max 300 chars). Get to the point.
 3. **subject**: One of these EXACT keys (write exactly): security_fraud, legal_compliance, ethics_management, product_bug, customer_service
    - security_fraud: fraud, data breach, security flaw
@@ -165,7 +169,12 @@ URL: {url}
 Excerpt: {content}
 
 Respond with is_substantive_article, summary, subject, author, authority_score, severity_score and sentiment.
-""".format(title=title[:200], url=url, content=(content or "")[:1500])
+""".format(
+        company_name=company_name or "the company",
+        title=title[:200],
+        url=url,
+        content=(content or "")[:1500],
+    )
     try:
         return structured_llm.invoke(prompt)
     except Exception as e:
@@ -173,7 +182,7 @@ Respond with is_substantive_article, summary, subject, author, authority_score, 
         return None
 
 
-def _process_single_article(r: dict) -> dict | None:
+def _process_single_article(r: dict, company_name: str = "") -> dict | None:
     """Process one Tavily result: fetch content, analyze with Gemini, score.
     Returns article dict or None if skipped."""
     title = r.get("title", "")
@@ -196,7 +205,7 @@ def _process_single_article(r: dict) -> dict | None:
         print(f"[AGENT 1] Skipped (newsletter/promo): {title[:60]}...")
         return None
 
-    scores = _analyze_article_with_gemini(title, content, url)
+    scores = _analyze_article_with_gemini(title, content, url, company_name)
     if scores is None:
         summary = (content or "")[:300] if content else title
         subject = "ethics_management"
@@ -271,7 +280,7 @@ def watcher_node(state: GraphState) -> dict:
     t_process = time.time()
     articles = []
     with ThreadPoolExecutor(max_workers=5) as pool:
-        futures = {pool.submit(_process_single_article, r): r for r in raw_results}
+        futures = {pool.submit(_process_single_article, r, company_name): r for r in raw_results}
         for future in as_completed(futures):
             try:
                 result = future.result()
